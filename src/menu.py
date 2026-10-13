@@ -2,66 +2,171 @@ import pygame
 import sys
 
 class StartMenu:
-    def __init__(self, screen, width, height):
+    """
+    Modern glassmorphic setup modal for Chess-AI.
+    Provides interactive controls for AI difficulty tiers, player side selection,
+    and timed chess clocks with tactile hover animations and visual feedback.
+    """
+
+    def __init__(self, screen, width, height, bg_surface=None, can_dismiss=True):
         self.screen = screen
         self.width = width
         self.height = height
+        self.bg_surface = bg_surface
+        self.can_dismiss = can_dismiss
 
         # Default Selections
         self.selected_difficulty = "Intermediate"  # "Basic", "Intermediate", "Advanced"
         self.selected_color = "White"             # "White", "Random", "Black"
         self.selected_time = "10 min Rapid"       # "Untimed", "1 min Bullet", "3 min Blitz", "5 min Blitz", "10 min Rapid", "15+10 Rapid"
 
-        # Fonts
-        self.title_font = pygame.font.SysFont("arial", 28, bold=True)
-        self.sec_font = pygame.font.SysFont("arial", 13, bold=True)
-        self.item_font = pygame.font.SysFont("arial", 15, bold=True)
-        self.item_sub_font = pygame.font.SysFont("arial", 12)
+        # Modern Fonts with Segoe UI / Arial fallbacks
+        font_family = "segoeui,segoe ui,helvetica,arial"
+        self.font_title = pygame.font.SysFont(font_family, 26, bold=True)
+        self.font_sub = pygame.font.SysFont(font_family, 12)
+        self.font_sec = pygame.font.SysFont(font_family, 12, bold=True)
+        self.font_item = pygame.font.SysFont(font_family, 15, bold=True)
+        self.font_item_sub = pygame.font.SysFont(font_family, 11)
+        self.font_badge = pygame.font.SysFont(font_family, 10, bold=True)
+        self.font_btn = pygame.font.SysFont(font_family, 17, bold=True)
+        self.font_hint = pygame.font.SysFont(font_family, 11)
+
+        # Modal Geometry (Centered inside screen)
+        self.modal_w = 630
+        self.modal_h = 676
+        self.modal_x = (self.width - self.modal_w) // 2
+        self.modal_y = (self.height - self.modal_h) // 2
+
+        # Color Palette Tokens
+        self.c_overlay = (14, 13, 11, 215)
+        self.c_modal_bg = (28, 27, 24)
+        self.c_modal_border = (58, 54, 48)
+        self.c_card_bg = (36, 34, 30)
+        self.c_card_border = (54, 51, 45)
+        self.c_card_hover_bg = (46, 44, 38)
+        self.c_card_hover_border = (86, 82, 73)
+        self.c_card_sel_bg = (38, 54, 28)
+        self.c_card_sel_border = (129, 182, 76)
+        self.c_accent_green = (129, 182, 76)
+        self.c_accent_hover = (145, 204, 86)
+        self.c_accent_dark = (92, 138, 50)
+        self.c_txt_primary = (255, 255, 255)
+        self.c_txt_muted = (160, 157, 149)
+        self.c_txt_accent = (140, 198, 84)
+
+    def draw_shadow(self, surface, rect, radius=22, blur=12):
+        """Draws a soft multilayered drop shadow behind a rect."""
+        shadow_surf = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
+        for i in range(blur, 0, -2):
+            alpha = int(35 * (1.0 - i / blur))
+            s_rect = pygame.Rect(rect.x - i, rect.y - i + 4, rect.w + i * 2, rect.h + i * 2)
+            pygame.draw.rect(shadow_surf, (0, 0, 0, alpha), s_rect, border_radius=radius + i)
+        surface.blit(shadow_surf, (0, 0))
 
     def draw_robot_icon(self, surface, center_x, center_y):
-        rect = pygame.Rect(0, 0, 52, 52)
-        rect.center = (center_x, center_y)
-        pygame.draw.rect(surface, (129, 182, 76), rect, border_radius=14)
+        """Draws a clean, solid robot badge with no highlight clipping or glare artifacts."""
+        badge_rect = pygame.Rect(0, 0, 52, 52)
+        badge_rect.center = (center_x, center_y)
+        pygame.draw.rect(surface, self.c_accent_green, badge_rect, border_radius=14)
 
-        # Draw clean bot face
-        head_rect = pygame.Rect(center_x - 14, center_y - 10, 28, 22)
-        pygame.draw.rect(surface, (32, 30, 27), head_rect, border_radius=5)
+        # Bot face frame
+        face_rect = pygame.Rect(center_x - 14, center_y - 10, 28, 22)
+        pygame.draw.rect(surface, (32, 30, 27), face_rect, border_radius=5)
 
-        # Eyes
-        pygame.draw.circle(surface, (129, 182, 76), (center_x - 6, center_y - 1), 3)
-        pygame.draw.circle(surface, (129, 182, 76), (center_x + 6, center_y - 1), 3)
+        # Eyes (clean solid green, no white glare)
+        pygame.draw.circle(surface, self.c_accent_green, (center_x - 6, center_y - 1), 3)
+        pygame.draw.circle(surface, self.c_accent_green, (center_x + 6, center_y - 1), 3)
 
-        # Mouth
-        pygame.draw.line(surface, (129, 182, 76), (center_x - 6, center_y + 5), (center_x + 6, center_y + 5), 2)
+        # Mouth bar
+        pygame.draw.line(surface, self.c_accent_green, (center_x - 6, center_y + 5), (center_x + 6, center_y + 5), 2)
 
         # Antenna
         pygame.draw.line(surface, (32, 30, 27), (center_x, center_y - 10), (center_x, center_y - 16), 2)
         pygame.draw.circle(surface, (32, 30, 27), (center_x, center_y - 17), 3)
 
-    def draw_color_icon(self, surface, color_type, center_x, center_y, radius=8):
+    def draw_color_icon(self, surface, color_type, center_x, center_y, radius=10):
+        """Draws a tactile 3D piece disc for White, Black, or Random side."""
         if color_type == "White":
-            pygame.draw.circle(surface, (240, 240, 240), (center_x, center_y), radius)
-            pygame.draw.circle(surface, (180, 180, 180), (center_x, center_y), radius, width=1)
+            # Ivory disc with bevel
+            pygame.draw.circle(surface, (180, 178, 172), (center_x, center_y + 1), radius)
+            pygame.draw.circle(surface, (245, 245, 240), (center_x, center_y), radius)
+            pygame.draw.circle(surface, (255, 255, 255), (center_x - 2, center_y - 2), radius - 3)
+            pygame.draw.circle(surface, (180, 178, 172), (center_x, center_y), radius, width=1)
         elif color_type == "Black":
-            pygame.draw.circle(surface, (20, 20, 20), (center_x, center_y), radius)
-            pygame.draw.circle(surface, (140, 140, 140), (center_x, center_y), radius, width=1)
+            # Obsidian disc with metallic rim
+            pygame.draw.circle(surface, (15, 15, 14), (center_x, center_y + 1), radius)
+            pygame.draw.circle(surface, (30, 29, 27), (center_x, center_y), radius)
+            pygame.draw.circle(surface, (60, 58, 54), (center_x, center_y), radius, width=1)
+            pygame.draw.circle(surface, (50, 48, 45), (center_x - 2, center_y - 2), radius - 4)
         elif color_type == "Random":
-            # Half white / half black circle
-            pygame.draw.circle(surface, (240, 240, 240), (center_x, center_y), radius)
-            rect = pygame.Rect(center_x, center_y - radius, radius, radius * 2)
-            pygame.draw.rect(surface, (40, 40, 40), rect)
-            pygame.draw.circle(surface, (180, 180, 180), (center_x, center_y), radius, width=1)
+            # Yin-yang split disc
+            pygame.draw.circle(surface, (150, 148, 142), (center_x, center_y + 1), radius)
+            pygame.draw.circle(surface, (245, 245, 240), (center_x, center_y), radius)
+            dark_half = pygame.Rect(center_x, center_y - radius, radius, radius * 2)
+            pygame.draw.rect(surface, (30, 29, 27), dark_half)
+            pygame.draw.circle(surface, (120, 118, 112), (center_x, center_y), radius, width=1)
+
+    def draw_checkmark(self, surface, center_x, center_y, radius=7):
+        """Draws a clean active indicator badge with checkmark lines."""
+        pygame.draw.circle(surface, self.c_accent_green, (center_x, center_y), radius)
+        p1 = (center_x - 3, center_y)
+        p2 = (center_x - 1, center_y + 3)
+        p3 = (center_x + 3, center_y - 3)
+        pygame.draw.lines(surface, (20, 26, 15), False, [p1, p2, p3], 2)
+
+    def draw_card(self, surface, rect, is_selected, is_hover, border_radius=12):
+        """Draws a modern interactive card container with tactile states."""
+        if is_selected:
+            bg_col = self.c_card_sel_bg
+            border_col = self.c_card_sel_border
+            border_w = 2
+        elif is_hover:
+            bg_col = self.c_card_hover_bg
+            border_col = self.c_card_hover_border
+            border_w = 1
+        else:
+            bg_col = self.c_card_bg
+            border_col = self.c_card_border
+            border_w = 1
+
+        pygame.draw.rect(surface, bg_col, rect, border_radius=border_radius)
+        pygame.draw.rect(surface, border_col, rect, width=border_w, border_radius=border_radius)
+
+    def draw_badge(self, surface, text, x, y, bg_col, txt_col=(255, 255, 255)):
+        """Draws a miniature pill badge tag."""
+        rendered = self.font_badge.render(text, True, txt_col)
+        pw = rendered.get_width() + 10
+        ph = 16
+        p_rect = pygame.Rect(x, y, pw, ph)
+        pygame.draw.rect(surface, bg_col, p_rect, border_radius=8)
+        surface.blit(rendered, rendered.get_rect(center=p_rect.center))
 
     def run(self):
-        """Displays the setup menu loop and returns selected configuration upon clicking Start Game"""
+        """Executes the setup menu loop and returns the game configuration dict."""
         running = True
         clock = pygame.time.Clock()
+        mouse_down = False
 
-        # Modal layout dimensions (640x670 centered)
-        modal_w = 640
-        modal_h = 670
-        modal_x = (self.width - modal_w) // 2
-        modal_y = (self.height - modal_h) // 2
+        # Precompute positions inside the modal
+        mx = self.modal_x
+        my = self.modal_y
+        mw = self.modal_w
+        mh = self.modal_h
+
+        # Dimensions for card grids (3 columns)
+        card_w = 172
+        card_gap = 17
+        start_x = mx + (mw - (3 * card_w + 2 * card_gap)) // 2
+
+        # Close button rect (top right)
+        close_rect = pygame.Rect(mx + mw - 38, my + 16, 24, 24)
+
+        # Start Button Rect
+        btn_w = mw - (start_x - mx) * 2
+        btn_h = 54
+        btn_x = start_x
+        btn_y = my + mh - 76
+        btn_rect = pygame.Rect(btn_x, btn_y, btn_w, btn_h)
 
         while running:
             mouse_pos = pygame.mouse.get_pos()
@@ -71,78 +176,114 @@ class StartMenu:
                 if event.type == pygame.QUIT:
                     pygame.quit()
                     sys.exit()
+
                 elif event.type == pygame.MOUSEBUTTONDOWN:
                     if event.button == 1:
+                        mouse_down = True
                         mouse_click = True
+
+                elif event.type == pygame.MOUSEBUTTONUP:
+                    if event.button == 1:
+                        mouse_down = False
+
                 elif event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_RETURN:
                         return self.get_config()
+                    elif event.key == pygame.K_ESCAPE:
+                        if self.can_dismiss:
+                            return None
+                        else:
+                            return self.get_config()
 
-            # Dark overlay background
-            overlay = pygame.Surface((self.width, self.height))
-            overlay.fill((18, 17, 15))
+            # -------------------------------------------------------------
+            # BACKDROP & OVERLAY
+            # -------------------------------------------------------------
+            if self.bg_surface:
+                self.screen.blit(self.bg_surface, (0, 0))
+            else:
+                self.screen.fill((18, 17, 15))
+
+            overlay = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
+            overlay.fill(self.c_overlay)
             self.screen.blit(overlay, (0, 0))
 
-            # Main Modal Container Card
-            card_rect = pygame.Rect(modal_x, modal_y, modal_w, modal_h)
-            pygame.draw.rect(self.screen, (34, 32, 29), card_rect, border_radius=20)
-            pygame.draw.rect(self.screen, (55, 52, 47), card_rect, width=2, border_radius=20)
+            # -------------------------------------------------------------
+            # MAIN MODAL CONTAINER
+            # -------------------------------------------------------------
+            card_rect = pygame.Rect(mx, my, mw, mh)
+            self.draw_shadow(self.screen, card_rect, radius=22, blur=14)
+
+            # Modal background
+            pygame.draw.rect(self.screen, self.c_modal_bg, card_rect, border_radius=22)
+            pygame.draw.rect(self.screen, self.c_modal_border, card_rect, width=2, border_radius=22)
+
+            # Glassmorphic top rim highlight
+            rim_rect = pygame.Rect(mx + 22, my + 1, mw - 44, 2)
+            rim_surf = pygame.Surface((rim_rect.w, rim_rect.h), pygame.SRCALPHA)
+            rim_surf.fill((255, 255, 255, 30))
+            self.screen.blit(rim_surf, rim_rect)
+
+            # Close 'X' button
+            if self.can_dismiss:
+                close_hover = close_rect.collidepoint(mouse_pos)
+                close_bg = (60, 56, 50) if close_hover else (38, 36, 32)
+                pygame.draw.rect(self.screen, close_bg, close_rect, border_radius=12)
+                x_col = (255, 255, 255) if close_hover else self.c_txt_muted
+                # Draw sharp vector X
+                cx, cy = close_rect.center
+                pygame.draw.line(self.screen, x_col, (cx - 4, cy - 4), (cx + 4, cy + 4), 2)
+                pygame.draw.line(self.screen, x_col, (cx + 4, cy - 4), (cx - 4, cy + 4), 2)
+                if mouse_click and close_hover:
+                    return None
 
             # -------------------------------------------------------------
             # HEADER AREA
             # -------------------------------------------------------------
-            self.draw_robot_icon(self.screen, self.width // 2, modal_y + 40)
+            self.draw_robot_icon(self.screen, self.width // 2, my + 44)
 
-            title_surf = self.title_font.render("Play Against AI", True, (255, 255, 255))
-            title_rect = title_surf.get_rect(center=(self.width // 2, modal_y + 88))
-            self.screen.blit(title_surf, title_rect)
+            title_surf = self.font_title.render("Play Against AI", True, self.c_txt_primary)
+            self.screen.blit(title_surf, title_surf.get_rect(center=(self.width // 2, my + 90)))
 
             # -------------------------------------------------------------
             # SECTION 1: CHOOSE DIFFICULTY
             # -------------------------------------------------------------
-            sec1_y = modal_y + 125
-            sec1_lbl = self.sec_font.render("1. CHOOSE DIFFICULTY", True, (160, 158, 150))
-            self.screen.blit(sec1_lbl, (modal_x + 35, sec1_y))
+            sec1_y = my + 130
+            sec1_lbl = self.font_sec.render("1. CHOOSE DIFFICULTY", True, self.c_txt_muted)
+            self.screen.blit(sec1_lbl, (start_x, sec1_y))
 
             diff_options = [
-                ("Basic", "Beginner (~800)", "Basic"),
-                ("Intermediate", "Casual (~1400)", "Intermediate"),
-                ("Advanced", "Master (~2100+)", "Advanced")
+                ("Basic", "Beginner (~800)", "Basic", "LVL 2", (60, 130, 60)),
+                ("Intermediate", "Casual (~1400)", "Intermediate", "LVL 4", (50, 110, 180)),
+                ("Advanced", "Master (~2100+)", "Advanced", "LVL 6", (180, 130, 40))
             ]
 
-            diff_card_w = 175
-            diff_card_h = 75
-            diff_gap = 22
-            start_diff_x = modal_x + 35
+            diff_h = 76
+            diff_y = sec1_y + 22
 
-            for i, (title, sub, key) in enumerate(diff_options):
-                cx = start_diff_x + i * (diff_card_w + diff_gap)
-                cy = sec1_y + 25
-                c_rect = pygame.Rect(cx, cy, diff_card_w, diff_card_h)
+            for i, (title, sub, key, tag, tag_col) in enumerate(diff_options):
+                cx = start_x + i * (card_w + card_gap)
+                c_rect = pygame.Rect(cx, diff_y, card_w, diff_h)
 
                 is_selected = (self.selected_difficulty == key)
                 is_hover = c_rect.collidepoint(mouse_pos)
 
+                self.draw_card(self.screen, c_rect, is_selected, is_hover, border_radius=12)
+
+                # Badge (LVL)
+                self.draw_badge(self.screen, tag, cx + 12, diff_y + 10, tag_col)
+
+                # Selected indicator
                 if is_selected:
-                    bg_col = (45, 60, 32)
-                    border_col = (129, 182, 76)
-                    txt_col = (129, 182, 76)
-                elif is_hover:
-                    bg_col = (50, 48, 43)
-                    border_col = (90, 87, 80)
-                    txt_col = (255, 255, 255)
-                else:
-                    bg_col = (42, 40, 36)
-                    border_col = (60, 57, 50)
-                    txt_col = (230, 228, 220)
+                    self.draw_checkmark(self.screen, cx + card_w - 18, diff_y + 18, radius=7)
 
-                pygame.draw.rect(self.screen, bg_col, c_rect, border_radius=12)
-                pygame.draw.rect(self.screen, border_col, c_rect, width=2 if is_selected else 1, border_radius=12)
+                # Titles
+                txt_col = self.c_txt_accent if is_selected else (self.c_txt_primary if is_hover else (225, 222, 215))
+                t_s = self.font_item.render(title, True, txt_col)
+                s_col = (175, 220, 140) if is_selected else self.c_txt_muted
+                s_s = self.font_item_sub.render(sub, True, s_col)
 
-                t_s = self.item_font.render(title, True, txt_col)
-                s_s = self.item_sub_font.render(sub, True, (160, 158, 150) if not is_selected else (170, 215, 130))
-                self.screen.blit(t_s, t_s.get_rect(center=(cx + diff_card_w // 2, cy + 28)))
-                self.screen.blit(s_s, s_s.get_rect(center=(cx + diff_card_w // 2, cy + 50)))
+                self.screen.blit(t_s, (cx + 12, diff_y + 32))
+                self.screen.blit(s_s, (cx + 12, diff_y + 52))
 
                 if mouse_click and is_hover:
                     self.selected_difficulty = key
@@ -150,50 +291,41 @@ class StartMenu:
             # -------------------------------------------------------------
             # SECTION 2: PLAY AS
             # -------------------------------------------------------------
-            sec2_y = modal_y + 235
-            sec2_lbl = self.sec_font.render("2. PLAY AS", True, (160, 158, 150))
-            self.screen.blit(sec2_lbl, (modal_x + 35, sec2_y))
+            sec2_y = my + 238
+            sec2_lbl = self.font_sec.render("2. PLAY AS", True, self.c_txt_muted)
+            self.screen.blit(sec2_lbl, (start_x, sec2_y))
 
             color_options = [
-                ("White", "White"),
-                ("Random", "Random"),
-                ("Black", "Black")
+                ("White", "First Move", "White"),
+                ("Random", "50 / 50 Side", "Random"),
+                ("Black", "Second Move", "Black")
             ]
 
-            col_card_w = 175
-            col_card_h = 50
-            start_col_x = modal_x + 35
+            col_h = 56
+            col_y = sec2_y + 22
 
-            for i, (key, label) in enumerate(color_options):
-                cx = start_col_x + i * (col_card_w + diff_gap)
-                cy = sec2_y + 25
-                c_rect = pygame.Rect(cx, cy, col_card_w, col_card_h)
+            for i, (label, sublabel, key) in enumerate(color_options):
+                cx = start_x + i * (card_w + card_gap)
+                c_rect = pygame.Rect(cx, col_y, card_w, col_h)
 
                 is_selected = (self.selected_color == key)
                 is_hover = c_rect.collidepoint(mouse_pos)
 
+                self.draw_card(self.screen, c_rect, is_selected, is_hover, border_radius=12)
+
+                # Color icon
+                self.draw_color_icon(self.screen, key, cx + 24, col_y + col_h // 2, radius=10)
+
+                # Text
+                txt_col = self.c_txt_accent if is_selected else (self.c_txt_primary if is_hover else (225, 222, 215))
+                l_s = self.font_item.render(label, True, txt_col)
+                sub_s = self.font_item_sub.render(sublabel, True, (175, 220, 140) if is_selected else self.c_txt_muted)
+
+                self.screen.blit(l_s, (cx + 42, col_y + 11))
+                self.screen.blit(sub_s, (cx + 42, col_y + 30))
+
                 if is_selected:
-                    bg_col = (45, 60, 32)
-                    border_col = (129, 182, 76)
-                    txt_col = (129, 182, 76)
-                elif is_hover:
-                    bg_col = (50, 48, 43)
-                    border_col = (90, 87, 80)
-                    txt_col = (255, 255, 255)
-                else:
-                    bg_col = (42, 40, 36)
-                    border_col = (60, 57, 50)
-                    txt_col = (230, 228, 220)
-
-                pygame.draw.rect(self.screen, bg_col, c_rect, border_radius=12)
-                pygame.draw.rect(self.screen, border_col, c_rect, width=2 if is_selected else 1, border_radius=12)
-
-                # Draw custom circle icon + label
-                lbl_s = self.item_font.render(label, True, txt_col)
-                total_w = 18 + lbl_s.get_width()
-                start_x = cx + (col_card_w - total_w) // 2
-                self.draw_color_icon(self.screen, key, start_x + 8, cy + 25, radius=7)
-                self.screen.blit(lbl_s, (start_x + 22, cy + 14))
+                    self.draw_checkmark(self.screen, cx + card_w - 16, col_y + 16, radius=6)
 
                 if mouse_click and is_hover:
                     self.selected_color = key
@@ -201,66 +333,86 @@ class StartMenu:
             # -------------------------------------------------------------
             # SECTION 3: TIME CONTROL
             # -------------------------------------------------------------
-            sec3_y = modal_y + 330
-            sec3_lbl = self.sec_font.render("3. TIME CONTROL", True, (160, 158, 150))
-            self.screen.blit(sec3_lbl, (modal_x + 35, sec3_y))
+            sec3_y = my + 332
+            sec3_lbl = self.font_sec.render("3. TIME CONTROL", True, self.c_txt_muted)
+            self.screen.blit(sec3_lbl, (start_x, sec3_y))
 
-            time_options = [
-                ["Untimed", "1 min Bullet", "3 min Blitz"],
-                ["5 min Blitz", "10 min Rapid", "15+10 Rapid"]
+            time_rows = [
+                [("Untimed", "No Clock"), ("1 min Bullet", "Bullet"), ("3 min Blitz", "Blitz")],
+                [("5 min Blitz", "Blitz"), ("10 min Rapid", "Rapid"), ("15+10 Rapid", "Increment")]
             ]
 
-            time_card_w = 175
-            time_card_h = 45
+            time_h = 46
+            time_gap_y = 10
+            base_time_y = sec3_y + 22
 
-            for row_idx, row in enumerate(time_options):
-                for col_idx, t_label in enumerate(row):
-                    cx = start_col_x + col_idx * (time_card_w + diff_gap)
-                    cy = sec3_y + 25 + row_idx * 55
-                    c_rect = pygame.Rect(cx, cy, time_card_w, time_card_h)
+            for r_idx, row in enumerate(time_rows):
+                for c_idx, (t_label, t_type) in enumerate(row):
+                    cx = start_x + c_idx * (card_w + card_gap)
+                    cy = base_time_y + r_idx * (time_h + time_gap_y)
+                    c_rect = pygame.Rect(cx, cy, card_w, time_h)
 
                     is_selected = (self.selected_time == t_label)
                     is_hover = c_rect.collidepoint(mouse_pos)
 
+                    self.draw_card(self.screen, c_rect, is_selected, is_hover, border_radius=10)
+
+                    # Text & Tag
+                    txt_col = self.c_txt_accent if is_selected else (self.c_txt_primary if is_hover else (225, 222, 215))
+                    ts_s = self.font_item.render(t_label, True, txt_col)
+                    self.screen.blit(ts_s, ts_s.get_rect(center=(cx + card_w // 2, cy + time_h // 2)))
+
                     if is_selected:
-                        bg_col = (45, 60, 32)
-                        border_col = (129, 182, 76)
-                        txt_col = (129, 182, 76)
-                    elif is_hover:
-                        bg_col = (50, 48, 43)
-                        border_col = (90, 87, 80)
-                        txt_col = (255, 255, 255)
-                    else:
-                        bg_col = (42, 40, 36)
-                        border_col = (60, 57, 50)
-                        txt_col = (230, 228, 220)
-
-                    pygame.draw.rect(self.screen, bg_col, c_rect, border_radius=10)
-                    pygame.draw.rect(self.screen, border_col, c_rect, width=2 if is_selected else 1, border_radius=10)
-
-                    ts_s = self.item_font.render(t_label, True, txt_col)
-                    self.screen.blit(ts_s, ts_s.get_rect(center=c_rect.center))
+                        self.draw_checkmark(self.screen, cx + card_w - 14, cy + 13, radius=5)
 
                     if mouse_click and is_hover:
                         self.selected_time = t_label
 
             # -------------------------------------------------------------
+            # ENGINE & SELECTION SUMMARY PILL
+            # -------------------------------------------------------------
+            sum_y = base_time_y + 2 * time_h + time_gap_y + 16
+            sum_rect = pygame.Rect(start_x, sum_y, btn_w, 36)
+            pygame.draw.rect(self.screen, (33, 31, 28), sum_rect, border_radius=10)
+            pygame.draw.rect(self.screen, (48, 46, 40), sum_rect, width=1, border_radius=10)
+
+            # Summary string
+            diff_level = 2 if self.selected_difficulty == "Basic" else (4 if self.selected_difficulty == "Intermediate" else 6)
+            engine_str = "Stockfish 17 UCI" if diff_level >= 4 else "Minimax Positional"
+            summary_str = f"Side: {self.selected_color}  •  AI: {self.selected_difficulty} (Lv.{diff_level})  •  {self.selected_time}  •  {engine_str}"
+            sum_surf = self.font_hint.render(summary_str, True, (175, 172, 163))
+            self.screen.blit(sum_surf, sum_surf.get_rect(center=sum_rect.center))
+
+            # -------------------------------------------------------------
             # START GAME BUTTON
             # -------------------------------------------------------------
-            btn_w = 570
-            btn_h = 55
-            btn_x = modal_x + 35
-            btn_y = modal_y + 570
-            btn_rect = pygame.Rect(btn_x, btn_y, btn_w, btn_h)
-
             btn_hover = btn_rect.collidepoint(mouse_pos)
-            btn_bg = (145, 200, 85) if btn_hover else (129, 182, 76)
+            btn_press = btn_hover and mouse_down
 
-            pygame.draw.rect(self.screen, btn_bg, btn_rect, border_radius=14)
+            # Tactile button depth offset
+            press_offset = 2 if btn_press else 0
+            draw_btn_rect = pygame.Rect(btn_rect.x, btn_rect.y + press_offset, btn_rect.w, btn_rect.h - press_offset)
 
-            btn_font = pygame.font.SysFont("arial", 18, bold=True)
-            btn_text = btn_font.render("Start Game", True, (20, 20, 20))
-            self.screen.blit(btn_text, btn_text.get_rect(center=btn_rect.center))
+            # 3D bottom bevel shadow
+            if not btn_press:
+                bevel_rect = pygame.Rect(btn_rect.x, btn_rect.y + 4, btn_rect.w, btn_rect.h)
+                pygame.draw.rect(self.screen, self.c_accent_dark, bevel_rect, border_radius=14)
+
+            btn_bg = self.c_accent_hover if btn_hover else self.c_accent_green
+            pygame.draw.rect(self.screen, btn_bg, draw_btn_rect, border_radius=14)
+
+            # Draw vector play triangle & centered label
+            btn_text = self.font_btn.render("Start Game", True, (20, 26, 15))
+            txt_w = btn_text.get_width()
+            txt_h = btn_text.get_height()
+            tri_x = btn_rect.centerx - txt_w // 2 - 14
+            tri_y = draw_btn_rect.centery
+            p1 = (tri_x, tri_y - 7)
+            p2 = (tri_x, tri_y + 7)
+            p3 = (tri_x + 10, tri_y)
+            pygame.draw.polygon(self.screen, (20, 26, 15), [p1, p2, p3])
+
+            self.screen.blit(btn_text, (btn_rect.centerx - txt_w // 2 + 4, draw_btn_rect.centery - txt_h // 2))
 
             if mouse_click and btn_hover:
                 return self.get_config()
@@ -269,7 +421,7 @@ class StartMenu:
             clock.tick(60)
 
     def get_config(self):
-        # Map selected difficulty to numerical level (1-6)
+        """Maps selected UI options to game configuration parameters."""
         if self.selected_difficulty == "Basic":
             level = 2
         elif self.selected_difficulty == "Intermediate":

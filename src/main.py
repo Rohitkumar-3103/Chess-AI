@@ -15,13 +15,22 @@ class Main:
         self.screen = pygame.display.set_mode( (WIDTH, HEIGHT + 80) )
         pygame.display.set_caption('Chess AI')
         self.game = Game()
-        self.open_menu()
+        self.open_menu(is_initial=True)
 
-    def open_menu(self):
-        menu = StartMenu(self.screen, WIDTH, HEIGHT + 80)
+    def open_menu(self, is_initial=False):
+        # Render board visuals under the modal backdrop
+        self.game.show_bg(self.screen)
+        self.game.show_last_move(self.screen)
+        self.game.show_moves(self.screen)
+        self.game.show_pieces(self.screen)
+        self.game.show_status_bar(self.screen)
+        bg_snapshot = self.screen.copy()
+
+        menu = StartMenu(self.screen, WIDTH, HEIGHT + 80, bg_surface=bg_snapshot, can_dismiss=not is_initial)
         config = menu.run()
-        self.game.reset()
-        self.game.setup(config)
+        if config is not None:
+            self.game.reset()
+            self.game.setup(config)
 
     def show_promotion_dialog(self, color):
         dialog_width = 360

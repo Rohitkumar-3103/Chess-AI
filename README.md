@@ -20,7 +20,7 @@ An intelligent, object-oriented Chess application built with **Python**, **Pygam
 - **Level 6 — Superhuman GM (3000+ Elo):** Full unconstrained Stockfish 17 analysis for grandmaster-level play.
 
 ### 🎨 Visual & Audio Experience
-- **Interactive Start Menu:** Select player color (White, Black, or Random), AI difficulty, and time controls.
+- **Modern Glassmorphic Start Menu:** Sleek dark-mode dialog with translucent board backdrop, tactile 3D cards, AI difficulty badges (LVL 2/4/6), side selectors, customizable time controls, and live selection summary pill.
 - **Multiple Board Themes:** Toggle between **Green**, **Brown**, **Blue**, and **Gray** themes dynamically with the `T` key.
 - **Custom Sound Effects:** Audio feedback for legal moves and piece captures.
 - **Smooth Piece Dragging:** Real-time piece dragging with hover indicators and legal move highlights.
