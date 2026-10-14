@@ -212,6 +212,8 @@ class Main:
                                 game.auto_mode = False
                         elif btn_action == 'theme':
                             game.change_theme()
+                        elif btn_action == 'reticle':
+                            game.change_reticle_color()
                         elif btn_action == 'level':
                             game.ai_difficulty = (game.ai_difficulty % 6) + 1
                         # Click handled
@@ -225,11 +227,44 @@ class Main:
                         clicked_col = dragger.mouseX // SQSIZE
 
                         if Square.in_range(clicked_row, clicked_col):
+                            # Check click-to-move destination if piece already selected
+                            if game.selected_piece and not dragger.dragging:
+                                initial = Square(game.selected_row, game.selected_col)
+                                final = Square(clicked_row, clicked_col)
+                                move = Move(initial, final)
+
+                                if board.valid_move(game.selected_piece, move):
+                                    from piece import Pawn
+                                    if isinstance(game.selected_piece, Pawn) and (clicked_row == 0 or clicked_row == 7):
+                                        promo_choice = self.show_promotion_dialog(game.selected_piece.color)
+                                        move.promo_piece = promo_choice
+
+                                    captured = board.squares[clicked_row][clicked_col].has_piece()
+                                    board.move(game.selected_piece, move)
+                                    board.set_true_en_passant(game.selected_piece)
+
+                                    game.play_sound(captured)
+                                    game.next_turn()
+                                    game.deselect()
+                                    continue
+                                elif board.squares[clicked_row][clicked_col].has_piece() and board.squares[clicked_row][clicked_col].piece.color == game.next_player:
+                                    # Switch selection to another piece of current player
+                                    piece = board.squares[clicked_row][clicked_col].piece
+                                    board.calc_moves(piece, clicked_row, clicked_col, bool=True)
+                                    game.select(piece, clicked_row, clicked_col)
+                                    dragger.save_initial(event.pos)
+                                    dragger.drag_piece(piece)
+                                    continue
+                                else:
+                                    game.deselect()
+                                    continue
+
                             if board.squares[clicked_row][clicked_col].has_piece():
                                 piece = board.squares[clicked_row][clicked_col].piece
 
                                 if piece.color == game.next_player:
                                     board.calc_moves(piece, clicked_row, clicked_col, bool=True)
+                                    game.select(piece, clicked_row, clicked_col)
                                     dragger.save_initial(event.pos)
                                     dragger.drag_piece(piece)
                 
@@ -249,6 +284,11 @@ class Main:
                         released_col = dragger.mouseX // SQSIZE
 
                         if Square.in_range(released_row, released_col):
+                            # If released on same square, leave piece selected (for click-to-move)
+                            if released_row == dragger.initial_row and released_col == dragger.initial_col:
+                                dragger.undrag_piece()
+                                continue
+
                             initial = Square(dragger.initial_row, dragger.initial_col)
                             final = Square(released_row, released_col)
                             move = Move(initial, final)
@@ -265,6 +305,9 @@ class Main:
 
                                 game.play_sound(captured)
                                 game.next_turn()
+                                game.deselect()
+                            else:
+                                game.deselect()
                     
                     dragger.undrag_piece()
                 
@@ -275,6 +318,9 @@ class Main:
 
                     elif event.key == pygame.K_t:
                         game.change_theme()
+
+                    elif event.key == pygame.K_c:
+                        game.change_reticle_color()
 
                     elif event.key == pygame.K_r:
                         game.reset()

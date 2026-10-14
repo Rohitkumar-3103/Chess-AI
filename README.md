@@ -96,10 +96,14 @@ python main.py
 
 | Key | Action |
 |:---:|:---|
-| **`T`** | Cycle Board Themes (Green → Brown → Blue → Gray) |
+| **`T`** | Cycle Board Themes (Emerald → Walnut → Ocean → Slate → Charcoal) |
+| **`C`** | Cycle Tactical Viewfinder Reticles (Blue → Green → White → Red) |
 | **`R`** | Reset / Restart Game |
+| **`A`** | Toggle Game Mode (Human vs AI → Auto-Play AI vs AI → PvP) |
+| **`M`** | Open Glassmorphic Setup Menu |
 | **`1` – `6`** | Switch AI Difficulty level on the fly |
-| **Left Click + Drag** | Pick up and move piece |
+| **Left Click** | Select piece (Click-to-Move) / Confirm destination |
+| **Left Click + Drag** | Pick up and move piece (Drag-and-Drop) |
 | **Release** | Drop piece onto target square |
 
 ---

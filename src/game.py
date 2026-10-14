@@ -8,6 +8,42 @@ from dragger import Dragger
 from config import Config
 from square import Square
 
+def create_reticle_surface(size, color_rgb, alpha=255):
+    """
+    Renders high-fidelity rounded-corner tactical viewfinder brackets matching
+    modern optical reticles and responsive square highlights.
+    """
+    scale = 4
+    S = size * scale
+    pad = 5 * scale
+    arm = 22 * scale
+    rad = 12 * scale
+    thick = 5 * scale
+    half_th = thick / 2
+
+    surf = pygame.Surface((S, S), pygame.SRCALPHA)
+    w = S - 2 * pad
+    h = S - 2 * pad
+    c = (*color_rgb, alpha)
+    pygame.draw.rect(surf, c, (pad, pad, w, h), width=int(thick), border_radius=int(rad))
+
+    eraser = (0, 0, 0, 0)
+    surf.fill(eraser, (pad + arm, pad - scale, w - 2 * arm, thick + 2 * scale))
+    surf.fill(eraser, (pad + arm, pad + h - thick - scale, w - 2 * arm, thick + 2 * scale))
+    surf.fill(eraser, (pad - scale, pad + arm, thick + 2 * scale, h - 2 * arm))
+    surf.fill(eraser, (pad + w - thick - scale, pad + arm, thick + 2 * scale, h - 2 * arm))
+
+    for x, y in [
+        (pad + arm, pad + half_th), (pad + half_th, pad + arm),
+        (pad + w - arm, pad + half_th), (pad + w - half_th, pad + arm),
+        (pad + arm, pad + h - half_th), (pad + half_th, pad + h - arm),
+        (pad + w - arm, pad + h - half_th), (pad + w - half_th, pad + h - arm)
+    ]:
+        pygame.draw.circle(surf, c, (x, y), int(half_th))
+
+    return pygame.transform.smoothscale(surf, (size, size))
+
+
 class Game:
 
     def __init__(self):
@@ -25,6 +61,11 @@ class Game:
         self.ai_player = 'black'
         self.ai_difficulty = 4
 
+        # Click-to-move and Selection States
+        self.selected_piece = None
+        self.selected_row = None
+        self.selected_col = None
+
         # Clock & Time Control
         self.time_control_name = "Untimed"
         self.white_time = None
@@ -38,6 +79,13 @@ class Game:
         self.game_over_dismissed = False
         self.hovered_btn = None
         self.active_config = None
+
+        # Pre-render Tactical Viewfinder Reticle Surfaces
+        self.reticle_surfaces = {}
+        self.reticle_hover_surfaces = {}
+        for c_name, c_rgb in self.config.reticle_colors.items():
+            self.reticle_surfaces[c_name] = create_reticle_surface(SQSIZE, c_rgb, 255)
+            self.reticle_hover_surfaces[c_name] = create_reticle_surface(SQSIZE, c_rgb, 95)
 
         # Modern Fonts with Segoe UI / Arial fallbacks
         font_family = "segoeui,segoe ui,helvetica,arial"
@@ -58,11 +106,12 @@ class Game:
         y = HEIGHT + 48
         h = 32
         self.buttons = {
-            'menu': pygame.Rect(10, y, 98, h),
-            'reset': pygame.Rect(116, y, 98, h),
-            'mode': pygame.Rect(222, y, 132, h),
-            'theme': pygame.Rect(362, y, 160, h),
-            'level': pygame.Rect(530, y, 180, h)
+            'menu': pygame.Rect(7, y, 78, h),
+            'reset': pygame.Rect(89, y, 78, h),
+            'mode': pygame.Rect(171, y, 108, h),
+            'theme': pygame.Rect(283, y, 138, h),
+            'reticle': pygame.Rect(425, y, 134, h),
+            'level': pygame.Rect(563, y, 150, h)
         }
         # Modal buttons
         self.modal_rematch_rect = pygame.Rect(155, 385, 185, 42)
@@ -269,44 +318,67 @@ class Game:
                             return
 
     def show_moves(self, surface):
-        """Draws signature modern dots and capture rings for valid moves."""
+        """Draws signature modern dots and capture rings for valid moves, framed by tactical rounded reticles."""
+        active_piece = None
+        sel_row, sel_col = None, None
+
         if self.dragger.dragging:
-            piece = self.dragger.piece
+            active_piece = self.dragger.piece
+            sel_row = self.dragger.initial_row
+            sel_col = self.dragger.initial_col
+        elif self.selected_piece:
+            active_piece = self.selected_piece
+            sel_row = self.selected_row
+            sel_col = self.selected_col
 
-            # Highlight source square
-            src_surf = pygame.Surface((SQSIZE, SQSIZE), pygame.SRCALPHA)
-            src_surf.fill((129, 182, 76, 100))
-            surface.blit(src_surf, (self.dragger.initial_col * SQSIZE, self.dragger.initial_row * SQSIZE))
+        if active_piece and sel_row is not None and sel_col is not None:
+            ret_col = self.config.reticle_color
 
+            # 1. Soft atmospheric glow behind the selected square
+            bg_surf = pygame.Surface((SQSIZE, SQSIZE), pygame.SRCALPHA)
+            bg_surf.fill((*ret_col, 28))
+            surface.blit(bg_surf, (sel_col * SQSIZE, sel_row * SQSIZE))
+
+            # 2. Modern Rounded Corner Viewfinder Reticle Brackets (Blue/Green/White/Red)
+            ret_surf = self.reticle_surfaces.get(self.config.reticle_color_name)
+            if ret_surf:
+                surface.blit(ret_surf, (sel_col * SQSIZE, sel_row * SQSIZE))
+
+            # 3. Valid move targets
             dot_surf = pygame.Surface((SQSIZE, SQSIZE), pygame.SRCALPHA)
             center = (SQSIZE // 2, SQSIZE // 2)
 
-            for move in piece.moves:
+            for move in active_piece.moves:
                 fr = move.final.row
                 fc = move.final.col
                 dest_sq = self.board.squares[fr][fc]
                 
                 is_capture = dest_sq.has_piece()
                 # Check en-passant capture
-                if not is_capture and piece.name == 'pawn' and abs(fc - move.initial.col) == 1 and dest_sq.isempty():
+                if not is_capture and active_piece.name == 'pawn' and abs(fc - move.initial.col) == 1 and dest_sq.isempty():
                     is_capture = True
 
                 dot_surf.fill((0, 0, 0, 0))
                 if is_capture:
-                    # Sleek donut ring for capture target
-                    pygame.draw.circle(dot_surf, (20, 20, 20, 55), center, 39, width=5)
+                    # Sleek donut ring for capture target matching reticle color
+                    pygame.draw.circle(dot_surf, (*ret_col, 190), center, 39, width=5)
+                    pygame.draw.circle(dot_surf, (20, 20, 20, 50), center, 39, width=2)
                 else:
                     # Soft translucent circular dot for empty destination
-                    pygame.draw.circle(dot_surf, (20, 20, 20, 50), center, 13)
+                    pygame.draw.circle(dot_surf, (*ret_col, 160), center, 14)
+                    pygame.draw.circle(dot_surf, (255, 255, 255, 200), center, 6)
 
                 surface.blit(dot_surf, (fc * SQSIZE, fr * SQSIZE))
 
     def show_hover(self, surface):
         if self.hovered_sqr and not self.dragger.dragging:
-            hover_surf = pygame.Surface((SQSIZE, SQSIZE), pygame.SRCALPHA)
-            pygame.draw.rect(hover_surf, (255, 255, 255, 28), (0, 0, SQSIZE, SQSIZE))
-            pygame.draw.rect(hover_surf, (255, 255, 255, 75), (0, 0, SQSIZE, SQSIZE), width=2)
-            surface.blit(hover_surf, (self.hovered_sqr.col * SQSIZE, self.hovered_sqr.row * SQSIZE))
+            # Avoid duplicate drawing over the currently selected square
+            if self.selected_piece and self.hovered_sqr.row == self.selected_row and self.hovered_sqr.col == self.selected_col:
+                return
+
+            hover_ret = self.reticle_hover_surfaces.get(self.config.reticle_color_name)
+            if hover_ret:
+                surface.blit(hover_ret, (self.hovered_sqr.col * SQSIZE, self.hovered_sqr.row * SQSIZE))
 
     def show_pieces(self, surface):
         for row in range(ROWS):
@@ -442,12 +514,14 @@ class Game:
 
         mode_str = "AI" if self.ai_mode and not self.auto_mode else ("Auto" if self.auto_mode else "PvP")
         theme_name = getattr(self.config.theme, 'name', 'Classic')
+        reticle_name = self.config.reticle_color_name.capitalize()
 
         btn_defs = [
             ('menu', "Menu", "M"),
             ('reset', "Reset", "R"),
             ('mode', f"Mode: {mode_str}", "A"),
             ('theme', f"Theme: {theme_name}", "T"),
+            ('reticle', f"Reticle: {reticle_name}", "C"),
             ('level', f"Lv.{self.ai_difficulty} {diff_str}", "1-6")
         ]
 
@@ -491,6 +565,18 @@ class Game:
                 pygame.draw.rect(surface, th.bg.dark, (ic_x + 6, ic_y - 6, 6, 12), border_top_right_radius=2, border_bottom_right_radius=2)
                 pygame.draw.rect(surface, (100, 96, 88), sw_rect, width=1, border_radius=2)
                 text_start_x = ic_x + 17
+            elif key == 'reticle':
+                # Mini 4-corner tactical reticle icon matching active color
+                ret_c = self.config.reticle_color
+                # Top-Left bracket
+                pygame.draw.lines(surface, ret_c, False, [(ic_x, ic_y - 2), (ic_x, ic_y - 5), (ic_x + 3, ic_y - 5)], 2)
+                # Top-Right bracket
+                pygame.draw.lines(surface, ret_c, False, [(ic_x + 8, ic_y - 5), (ic_x + 11, ic_y - 5), (ic_x + 11, ic_y - 2)], 2)
+                # Bottom-Left bracket
+                pygame.draw.lines(surface, ret_c, False, [(ic_x, ic_y + 2), (ic_x, ic_y + 5), (ic_x + 3, ic_y + 5)], 2)
+                # Bottom-Right bracket
+                pygame.draw.lines(surface, ret_c, False, [(ic_x + 8, ic_y + 5), (ic_x + 11, ic_y + 5), (ic_x + 11, ic_y + 2)], 2)
+                text_start_x = ic_x + 16
             elif key == 'level':
                 # Lightning bolt icon
                 pts = [(ic_x + 5, ic_y - 6), (ic_x + 2, ic_y), (ic_x + 6, ic_y), (ic_x + 3, ic_y + 6), (ic_x + 9, ic_y - 1), (ic_x + 6, ic_y - 1)]
@@ -677,6 +763,19 @@ class Game:
     def change_theme(self):
         self.config.change_theme()
 
+    def change_reticle_color(self):
+        self.config.change_reticle_color()
+
+    def select(self, piece, row, col):
+        self.selected_piece = piece
+        self.selected_row = row
+        self.selected_col = col
+
+    def deselect(self):
+        self.selected_piece = None
+        self.selected_row = None
+        self.selected_col = None
+
     def play_sound(self, captured=False):
         if captured:
             self.config.capture_sound.play()
@@ -685,7 +784,10 @@ class Game:
 
     def reset(self):
         saved_config = self.active_config
+        saved_reticle = self.config.reticle_idx
         self.__init__()
+        self.config.reticle_idx = saved_reticle
+        self.config.reticle_color_name = self.config.reticle_color_names[saved_reticle]
         if saved_config:
             self.setup(saved_config)
 

@@ -18,10 +18,29 @@ class Config:
         self.capture_sound = Sound(
             os.path.join('assets/sounds/capture.wav'))
 
+        # Tactical Modern Viewfinder Reticle Colors (Blue, Green, White, Red)
+        self.reticle_colors = {
+            'blue': (99, 102, 241),    # Indigo / Soft Blue (#6366F1)
+            'green': (74, 222, 128),   # Neon Mint Emerald (#4ADE80)
+            'white': (255, 255, 255),  # Studio Pure White (#FFFFFF)
+            'red': (248, 113, 113)     # Coral Crimson (#F87171)
+        }
+        self.reticle_color_names = ['blue', 'green', 'white', 'red']
+        self.reticle_idx = 0
+        self.reticle_color_name = self.reticle_color_names[self.reticle_idx]
+
+    @property
+    def reticle_color(self):
+        return self.reticle_colors[self.reticle_color_name]
+
     def change_theme(self):
         self.idx += 1
         self.idx %= len(self.themes)
         self.theme = self.themes[self.idx]
+
+    def change_reticle_color(self):
+        self.reticle_idx = (self.reticle_idx + 1) % len(self.reticle_color_names)
+        self.reticle_color_name = self.reticle_color_names[self.reticle_idx]
 
     def _add_themes(self):
         # 1. Emerald (Chess.com Signature Green)
