@@ -11,9 +11,8 @@ class Config:
         self._add_themes()
         self.idx = 0
         self.theme = self.themes[self.idx]
-        self.font = pygame.font.SysFont('monospace', 18, bold=True)
+        self.font = pygame.font.SysFont('segoeui,segoe ui,helvetica,arial', 16, bold=True)
 
-        # font
         self.move_sound = Sound(
             os.path.join('assets/sounds/move.wav'))
         self.capture_sound = Sound(
@@ -25,9 +24,40 @@ class Config:
         self.theme = self.themes[self.idx]
 
     def _add_themes(self):
-        green = Theme((234, 235, 200), (119, 154, 88), (244, 247, 116), (172, 195, 51), '#C86464', '#C84646')
-        brown = Theme((235, 209, 166), (165, 117, 80), (245, 234, 100), (209, 185, 59), '#C86464', '#C84646')
-        blue = Theme((229, 228, 200), (60, 95, 135), (123, 187, 227), (43, 119, 191), '#C86464', '#C84646')
-        gray = Theme((120, 119, 118), (86, 85, 84), (99, 126, 143), (82, 102, 128), '#C86464', '#C84646')
+        # 1. Emerald (Chess.com Signature Green)
+        emerald = Theme(
+            (238, 238, 210), (118, 150, 86),
+            (247, 247, 105), (186, 202, 43),
+            '#C86464', '#C84646',
+            name="Emerald"
+        )
+        # 2. Walnut (Classic Warm Wood)
+        walnut = Theme(
+            (240, 217, 181), (181, 136, 99),
+            (205, 210, 106), (170, 162, 58),
+            '#C86464', '#C84646',
+            name="Walnut"
+        )
+        # 3. Ocean (Contemporary Oceanic Blue)
+        ocean = Theme(
+            (235, 237, 240), (110, 142, 168),
+            (135, 195, 235), (60, 135, 190),
+            '#C86464', '#C84646',
+            name="Ocean"
+        )
+        # 4. Slate (Midnight Minimalist Slate)
+        slate = Theme(
+            (220, 224, 228), (82, 102, 122),
+            (160, 185, 210), (95, 125, 155),
+            '#C86464', '#C84646',
+            name="Slate"
+        )
+        # 5. Charcoal (Dark Carbon Tournament)
+        charcoal = Theme(
+            (175, 175, 175), (78, 78, 78),
+            (195, 195, 135), (135, 135, 80),
+            '#C86464', '#C84646',
+            name="Charcoal"
+        )
 
-        self.themes = [green, brown, blue, gray]
+        self.themes = [emerald, walnut, ocean, slate, charcoal]

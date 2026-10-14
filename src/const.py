@@ -1,6 +1,8 @@
 # Screen dimensions
 WIDTH = 720
 HEIGHT = 720
+BAR_HEIGHT = 90
+TOTAL_HEIGHT = HEIGHT + BAR_HEIGHT
 
 # Board dimensions
 ROWS = 8

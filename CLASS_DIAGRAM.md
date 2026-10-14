@@ -77,8 +77,13 @@ classDiagram
         +show_pieces(surface)
         +show_moves(surface)
         +show_last_move(surface)
+        +show_check(surface)
         +show_hover(surface)
         +show_status_bar(surface)
+        +show_game_over_banner(surface)
+        +handle_mouse_motion(pos)
+        +handle_button_click(pos) str
+        +get_material_imbalance() int
         +format_time(seconds) str
         +next_turn()
         +set_hover(row, col)
@@ -212,11 +217,12 @@ classDiagram
     }
 
     class Theme {
+        +str name
         +Color bg
         +Color moves
         +Color trace
         +Color highlight
-        +__init__(bg_light, bg_dark, moves_light, moves_dark, trace_light, trace_dark)
+        +__init__(bg_light, bg_dark, moves_light, moves_dark, trace_light, trace_dark, name)
     }
 
     class Color {

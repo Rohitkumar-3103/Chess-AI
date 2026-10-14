@@ -21,15 +21,13 @@ An intelligent, object-oriented Chess application built with **Python**, **Pygam
 
 ### 🎨 Visual & Audio Experience
 - **Modern Glassmorphic Start Menu:** Sleek dark-mode dialog with translucent board backdrop, tactile 3D cards, AI difficulty badges (LVL 2/4/6), side selectors, customizable time controls, and live selection summary pill.
-- **Multiple Board Themes:** Toggle between **Green**, **Brown**, **Blue**, and **Gray** themes dynamically with the `T` key.
-- **Custom Sound Effects:** Audio feedback for legal moves and piece captures.
-- **Smooth Piece Dragging:** Real-time piece dragging with hover indicators and legal move highlights.
-- **Pawn Promotion Modal:** Graphical dialog allowing player selection of Queen, Rook, Bishop, or Knight upon pawn promotion.
-
-### ⏱️ Time Controls & Game Modes
-- Standard chess clock with customizable timers (Bullet, Blitz, Rapid, Classical, and Unlimited).
-- Check, Checkmate, and Stalemate validation.
-- En Passant and Castling (Kingside and Queenside) fully enforced.
+- **Interactive In-Game Dashboard & HUD:** Real-time turn pill (`Your Turn`, `Thinking...`, `Finished`), material advantage indicator (`+N`), digital clocks, and a tactile toolbar featuring clickable buttons (`Menu`, `Reset`, `Mode`, `Theme`, `Level`) with custom vector graphics and keyboard shortcut tags.
+- **Signature Move Indicators:** Semi-transparent dots for empty destination squares and circular target rings for captures, matching top modern platforms (Chess.com / Lichess).
+- **Subtle Highlights & Check Danger Halo:** Soft translucent warm overlay for previous moves, hover feedback, lifted piece source square tint, and radial crimson danger glow on kings in check.
+- **5 Curated Color Themes:** Dynamic live cycling between **Emerald**, **Walnut**, **Ocean**, **Slate**, and **Charcoal** with live split-color swatches in the toolbar.
+- **Victory & Game Over Modal:** Celebration overlay card featuring outcome badge, result description, and 1-click Rematch (`R`) and Setup Menu (`M`) actions.
+- **Pawn Promotion Modal:** Graphical floating glassmorphic dialog for Queen, Rook, Bishop, or Knight selection.
+- **Custom Sound Effects:** High-quality audio feedback for legal moves and piece captures.
 
 ---
 

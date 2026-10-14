@@ -12,7 +12,7 @@ class Main:
 
     def __init__(self):
         pygame.init()
-        self.screen = pygame.display.set_mode( (WIDTH, HEIGHT + 80) )
+        self.screen = pygame.display.set_mode((WIDTH, TOTAL_HEIGHT))
         pygame.display.set_caption('Chess AI')
         self.game = Game()
         self.open_menu(is_initial=True)
@@ -21,27 +21,29 @@ class Main:
         # Render board visuals under the modal backdrop
         self.game.show_bg(self.screen)
         self.game.show_last_move(self.screen)
+        self.game.show_check(self.screen)
         self.game.show_moves(self.screen)
         self.game.show_pieces(self.screen)
         self.game.show_status_bar(self.screen)
         bg_snapshot = self.screen.copy()
 
-        menu = StartMenu(self.screen, WIDTH, HEIGHT + 80, bg_surface=bg_snapshot, can_dismiss=not is_initial)
+        menu = StartMenu(self.screen, WIDTH, TOTAL_HEIGHT, bg_surface=bg_snapshot, can_dismiss=not is_initial)
         config = menu.run()
         if config is not None:
             self.game.reset()
             self.game.setup(config)
 
     def show_promotion_dialog(self, color):
-        dialog_width = 360
-        dialog_height = 100
+        dialog_width = 390
+        dialog_height = 140
         dialog_x = (WIDTH - dialog_width) // 2
         dialog_y = (HEIGHT - dialog_height) // 2
         
         options = ['queen', 'rook', 'bishop', 'knight']
+        names = ['Queen', 'Rook', 'Bishop', 'Knight']
         rects = []
         for i in range(4):
-            rect = pygame.Rect(dialog_x + 10 + i * 85, dialog_y + 10, 80, 80)
+            rect = pygame.Rect(dialog_x + 18 + i * 90, dialog_y + 44, 76, 80)
             rects.append(rect)
             
         from piece import Queen, Rook, Bishop, Knight
@@ -49,28 +51,54 @@ class Main:
         for p in pieces:
             p.set_texture(size=80)
             
+        font_title = pygame.font.SysFont("segoeui,segoe ui,helvetica,arial", 13, bold=True)
+        font_name = pygame.font.SysFont("segoeui,segoe ui,helvetica,arial", 10, bold=True)
         waiting = True
         choice = 'queen'
         
         while waiting:
-            overlay = pygame.Surface((WIDTH, HEIGHT + 80))
-            overlay.fill((0, 0, 0))
-            overlay.set_alpha(150)
+            overlay = pygame.Surface((WIDTH, TOTAL_HEIGHT), pygame.SRCALPHA)
+            overlay.fill((0, 0, 0, 160))
             self.screen.blit(overlay, (0, 0))
             
-            pygame.draw.rect(self.screen, (40, 40, 40), (dialog_x, dialog_y, dialog_width, dialog_height), border_radius=10)
-            pygame.draw.rect(self.screen, (80, 80, 80), (dialog_x, dialog_y, dialog_width, dialog_height), width=3, border_radius=10)
+            # Modal container
+            modal_rect = pygame.Rect(dialog_x, dialog_y, dialog_width, dialog_height)
+            pygame.draw.rect(self.screen, (28, 27, 24), modal_rect, border_radius=14)
+            pygame.draw.rect(self.screen, (58, 54, 48), modal_rect, width=2, border_radius=14)
+
+            # Top rim
+            rim = pygame.Surface((dialog_width - 24, 2), pygame.SRCALPHA)
+            rim.fill((255, 255, 255, 30))
+            self.screen.blit(rim, (dialog_x + 12, dialog_y + 1))
+            
+            # Header
+            t_surf = font_title.render("SELECT PROMOTION PIECE", True, (240, 238, 232))
+            self.screen.blit(t_surf, t_surf.get_rect(center=(WIDTH // 2, dialog_y + 22)))
             
             mouse_pos = pygame.mouse.get_pos()
+            any_hover = False
             
             for i, rect in enumerate(rects):
-                bg_color = (60, 60, 60) if rect.collidepoint(mouse_pos) else (45, 45, 45)
+                is_hover = rect.collidepoint(mouse_pos)
+                if is_hover:
+                    any_hover = True
+                bg_color = (48, 45, 39) if is_hover else (36, 34, 30)
+                border_color = (129, 182, 76) if is_hover else (54, 51, 45)
+                
                 pygame.draw.rect(self.screen, bg_color, rect, border_radius=8)
-                pygame.draw.rect(self.screen, (120, 120, 120), rect, width=2, border_radius=8)
+                pygame.draw.rect(self.screen, border_color, rect, width=1, border_radius=8)
                 
                 img = pygame.image.load(pieces[i].texture)
-                img_rect = img.get_rect(center=rect.center)
-                self.screen.blit(img, img_rect)
+                img_scaled = pygame.transform.smoothscale(img, (52, 52))
+                self.screen.blit(img_scaled, img_scaled.get_rect(center=(rect.centerx, rect.y + 32)))
+
+                n_surf = font_name.render(names[i], True, (200, 198, 190) if is_hover else (150, 147, 140))
+                self.screen.blit(n_surf, n_surf.get_rect(center=(rect.centerx, rect.bottom - 12)))
+
+            if any_hover:
+                pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_HAND)
+            else:
+                pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_ARROW)
                 
             pygame.display.update()
             
@@ -79,18 +107,17 @@ class Main:
                     pygame.quit()
                     sys.exit()
                     
-                if event.type == pygame.MOUSEBUTTONDOWN:
-                    if event.button == 1:
-                        for i, rect in enumerate(rects):
-                            if rect.collidepoint(event.pos):
-                                choice = options[i]
-                                waiting = False
-                                break
-                                
+                if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                    for i, rect in enumerate(rects):
+                        if rect.collidepoint(event.pos):
+                            choice = options[i]
+                            waiting = False
+                            break
+                            
+        pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_ARROW)
         return choice
 
     def mainloop(self):
-        
         screen = self.screen
         game = self.game
 
@@ -101,13 +128,15 @@ class Main:
             # Update clock time
             self.game.update_clock()
 
-            # show methods
+            # Render visuals
             game.show_bg(screen)
             game.show_last_move(screen)
+            game.show_check(screen)
             game.show_moves(screen)
             game.show_pieces(screen)
             game.show_hover(screen)
             game.show_status_bar(screen)
+            game.show_game_over_banner(screen)
 
             if dragger.dragging:
                 dragger.update_blit(screen)
@@ -164,51 +193,55 @@ class Main:
 
             for event in pygame.event.get():
 
-                # click
-                if event.type == pygame.MOUSEBUTTONDOWN and not game.game_over:
-                    dragger.update_mouse(event.pos)
+                # Mouse Click
+                if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                    btn_action = game.handle_button_click(event.pos)
+                    if btn_action:
+                        if btn_action == 'menu':
+                            self.open_menu()
+                        elif btn_action in ('reset', 'rematch'):
+                            game.reset()
+                        elif btn_action == 'mode':
+                            if not game.ai_mode:
+                                game.ai_mode = True
+                                game.auto_mode = False
+                            elif game.ai_mode and not game.auto_mode:
+                                game.auto_mode = True
+                            else:
+                                game.ai_mode = False
+                                game.auto_mode = False
+                        elif btn_action == 'theme':
+                            game.change_theme()
+                        elif btn_action == 'level':
+                            game.ai_difficulty = (game.ai_difficulty % 6) + 1
+                        # Click handled
+                        continue
 
-                    clicked_row = dragger.mouseY // SQSIZE
-                    clicked_col = dragger.mouseX // SQSIZE
+                    # If not clicked on UI button, check board piece interaction
+                    if not game.game_over:
+                        dragger.update_mouse(event.pos)
 
-                    # if clicked square is inside board range and has a piece ?
-                    if Square.in_range(clicked_row, clicked_col):
-                        if board.squares[clicked_row][clicked_col].has_piece():
-                            piece = board.squares[clicked_row][clicked_col].piece
+                        clicked_row = dragger.mouseY // SQSIZE
+                        clicked_col = dragger.mouseX // SQSIZE
 
-                            # valid piece (color) ?
-                            if piece.color == game.next_player:
-                                board.calc_moves(piece, clicked_row, clicked_col, bool=True)
-                                dragger.save_initial(event.pos)
-                                dragger.drag_piece(piece)
+                        if Square.in_range(clicked_row, clicked_col):
+                            if board.squares[clicked_row][clicked_col].has_piece():
+                                piece = board.squares[clicked_row][clicked_col].piece
 
-                                # show methods 
-                                game.show_bg(screen)
-                                game.show_last_move(screen)
-                                game.show_moves(screen)
-                                game.show_pieces(screen)
+                                if piece.color == game.next_player:
+                                    board.calc_moves(piece, clicked_row, clicked_col, bool=True)
+                                    dragger.save_initial(event.pos)
+                                    dragger.drag_piece(piece)
                 
-                # mouse motion
+                # Mouse Motion
                 elif event.type == pygame.MOUSEMOTION:
-                    motion_row = event.pos[1] // SQSIZE
-                    motion_col = event.pos[0] // SQSIZE
-
-                    game.set_hover(motion_row, motion_col)
+                    game.handle_mouse_motion(event.pos)
 
                     if dragger.dragging:
                         dragger.update_mouse(event.pos)
-
-                        # show methods
-                        game.show_bg(screen)
-                        game.show_last_move(screen)
-                        game.show_moves(screen)
-                        game.show_pieces(screen)
-                        game.show_hover(screen)
-                        dragger.update_blit(screen)
                 
-                # click release
+                # Mouse Click Release
                 elif event.type == pygame.MOUSEBUTTONUP and not game.game_over:
-                    
                     if dragger.dragging:
                         dragger.update_mouse(event.pos)
 
@@ -216,53 +249,36 @@ class Main:
                         released_col = dragger.mouseX // SQSIZE
 
                         if Square.in_range(released_row, released_col):
-                            # create possible move
                             initial = Square(dragger.initial_row, dragger.initial_col)
                             final = Square(released_row, released_col)
                             move = Move(initial, final)
 
-                            # valid move ?
                             if board.valid_move(dragger.piece, move):
                                 from piece import Pawn
                                 if isinstance(dragger.piece, Pawn) and (released_row == 0 or released_row == 7):
                                     promo_choice = self.show_promotion_dialog(dragger.piece.color)
                                     move.promo_piece = promo_choice
 
-                                # normal capture
                                 captured = board.squares[released_row][released_col].has_piece()
                                 board.move(dragger.piece, move)
-
                                 board.set_true_en_passant(dragger.piece)                            
 
-                                # sounds
                                 game.play_sound(captured)
-
-                                # show methods
-                                game.show_bg(screen)
-                                game.show_last_move(screen)
-                                game.show_pieces(screen)
-                                
-                                # next turn
                                 game.next_turn()
                     
                     dragger.undrag_piece()
                 
-                # key press
+                # Keyboard Shortcuts
                 elif event.type == pygame.KEYDOWN:
-                    
-                    # Open Menu Modal
                     if event.key == pygame.K_m:
                         self.open_menu()
 
-                    # changing themes
                     elif event.key == pygame.K_t:
                         game.change_theme()
 
-                    # resetting game
                     elif event.key == pygame.K_r:
                         game.reset()
                         
-                    # toggling AI modes (Human vs AI -> AUTO AI vs AI -> PVP)
                     elif event.key == pygame.K_a:
                         if not game.ai_mode:
                             game.ai_mode = True
@@ -273,7 +289,6 @@ class Main:
                             game.ai_mode = False
                             game.auto_mode = False
 
-                    # changing AI difficulty
                     elif event.key == pygame.K_1:
                         game.ai_difficulty = 1
                     elif event.key == pygame.K_2:
@@ -287,7 +302,7 @@ class Main:
                     elif event.key == pygame.K_6:
                         game.ai_difficulty = 6
 
-                # quit application
+                # Quit Application
                 elif event.type == pygame.QUIT:
                     pygame.quit()
                     sys.exit()

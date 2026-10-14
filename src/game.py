@@ -1,4 +1,6 @@
 import pygame
+import os
+import time
 
 from const import *
 from board import Board
@@ -21,7 +23,7 @@ class Game:
         self.ai_mode = True
         self.auto_mode = False
         self.ai_player = 'black'
-        self.ai_difficulty = 3
+        self.ai_difficulty = 4
 
         # Clock & Time Control
         self.time_control_name = "Untimed"
@@ -31,9 +33,45 @@ class Game:
         self.last_tick = None
         self.timeout_winner = None
 
+        # UX & Visual Enhancements
+        self.image_cache = {}
+        self.game_over_dismissed = False
+        self.hovered_btn = None
+        self.active_config = None
+
+        # Modern Fonts with Segoe UI / Arial fallbacks
+        font_family = "segoeui,segoe ui,helvetica,arial"
+        self.font_coords = pygame.font.SysFont(font_family, 16, bold=True)
+        self.font_status = pygame.font.SysFont(font_family, 13, bold=True)
+        self.font_sub = pygame.font.SysFont(font_family, 11)
+        self.font_badge = pygame.font.SysFont(font_family, 10, bold=True)
+        self.font_clock = pygame.font.SysFont("segoeui,segoe ui,consolas,monospace", 13, bold=True)
+        self.font_btn = pygame.font.SysFont(font_family, 11, bold=True)
+        self.font_btn_badge = pygame.font.SysFont(font_family, 9, bold=True)
+        self.font_modal_title = pygame.font.SysFont(font_family, 19, bold=True)
+        self.font_modal_sub = pygame.font.SysFont(font_family, 12)
+
+        # Toolbar Buttons Rects
+        self._init_buttons()
+
+    def _init_buttons(self):
+        y = HEIGHT + 48
+        h = 32
+        self.buttons = {
+            'menu': pygame.Rect(10, y, 98, h),
+            'reset': pygame.Rect(116, y, 98, h),
+            'mode': pygame.Rect(222, y, 132, h),
+            'theme': pygame.Rect(362, y, 160, h),
+            'level': pygame.Rect(530, y, 180, h)
+        }
+        # Modal buttons
+        self.modal_rematch_rect = pygame.Rect(155, 385, 185, 42)
+        self.modal_menu_rect = pygame.Rect(360, 385, 185, 42)
+        self.modal_close_rect = pygame.Rect(550, 272, 24, 24)
+
     def setup(self, config):
         import random
-        import time
+        self.active_config = config
         self.ai_difficulty = config.get("difficulty", 4)
         chosen_color = config.get("color", "White")
         
@@ -70,9 +108,9 @@ class Game:
             self.black_time = None
             
         self.last_tick = time.time()
+        self.game_over_dismissed = False
 
     def update_clock(self):
-        import time
         if self.game_over or self.white_time is None:
             return
 
@@ -96,6 +134,20 @@ class Game:
                 self.black_time = 0.0
                 self.game_over = True
                 self.timeout_winner = 'white'
+
+    def get_material_imbalance(self):
+        val_map = {'pawn': 1, 'knight': 3, 'bishop': 3, 'rook': 5, 'queen': 9}
+        w_total = 0
+        b_total = 0
+        for r in range(ROWS):
+            for c in range(COLS):
+                sq = self.board.squares[r][c]
+                if sq.has_piece() and sq.piece.name in val_map:
+                    if sq.piece.color == 'white':
+                        w_total += val_map[sq.piece.name]
+                    else:
+                        b_total += val_map[sq.piece.name]
+        return w_total - b_total
 
     def to_chess_board(self):
         import chess
@@ -159,42 +211,122 @@ class Game:
                         
         return board
 
-    # blit methods
+    # -------------------------------------------------------------
+    # RENDERING METHODS
+    # -------------------------------------------------------------
 
     def show_bg(self, surface):
         theme = self.config.theme
         
         for row in range(ROWS):
             for col in range(COLS):
-
-                # color
-                color = theme.bg.light if (row + col) % 2 == 0 else theme.bg.dark
-                # rect
+                # Square background color
+                is_light = (row + col) % 2 == 0
+                color = theme.bg.light if is_light else theme.bg.dark
                 rect = (col * SQSIZE, row * SQSIZE, SQSIZE, SQSIZE)
-                # blit
                 pygame.draw.rect(surface, color, rect)
 
-                # row coordinates
+                # Row coordinates (Ranks 8 to 1 on col 0)
                 if col == 0:
+                    text_color = theme.bg.dark if is_light else theme.bg.light
+                    lbl = self.font_coords.render(str(ROWS - row), True, text_color)
+                    surface.blit(lbl, (col * SQSIZE + 5, row * SQSIZE + 4))
 
-                    # color
-                    color = theme.bg.dark if row % 2 == 0 else theme.bg.light
-                    # label
-                    lbl = self.config.font.render(str(ROWS-row), 1, color)
-                    lbl_pos = (5, 5 + row * SQSIZE)
-                    # blit
-                    surface.blit(lbl, lbl_pos)
-
-                # col coordinates
+                # Col coordinates (Files a to h on row 7)
                 if row == 7:
+                    text_color = theme.bg.dark if is_light else theme.bg.light
+                    lbl = self.font_coords.render(Square.get_alphacol(col), True, text_color)
+                    pos_x = col * SQSIZE + SQSIZE - lbl.get_width() - 5
+                    pos_y = row * SQSIZE + SQSIZE - lbl.get_height() - 4
+                    surface.blit(lbl, (pos_x, pos_y))
 
-                    # color
-                    color = theme.bg.dark if (row + col) % 2 == 0 else theme.bg.light
-                    # label
-                    lbl = self.config.font.render(Square.get_alphacol(col), 1, color)
-                    lbl_pos = (col * SQSIZE + SQSIZE - 20, HEIGHT - 20)
-                    # blit
-                    surface.blit(lbl, lbl_pos)
+    def show_last_move(self, surface):
+        theme = self.config.theme
+        if self.board.last_move:
+            initial = self.board.last_move.initial
+            final = self.board.last_move.final
+
+            hl_surf = pygame.Surface((SQSIZE, SQSIZE), pygame.SRCALPHA)
+            for pos in [initial, final]:
+                base_color = theme.trace.light if (pos.row + pos.col) % 2 == 0 else theme.trace.dark
+                r, g, b = base_color if isinstance(base_color, tuple) else pygame.Color(base_color)[:3]
+                hl_surf.fill((r, g, b, 125))
+                surface.blit(hl_surf, (pos.col * SQSIZE, pos.row * SQSIZE))
+
+    def show_check(self, surface):
+        """Draws a crimson radial alert around the king when in check."""
+        if self.check and not self.game_over:
+            king = self.board.get_king(self.next_player)
+            if king:
+                for r in range(ROWS):
+                    for c in range(COLS):
+                        if self.board.squares[r][c].piece == king:
+                            check_surf = pygame.Surface((SQSIZE, SQSIZE), pygame.SRCALPHA)
+                            center = (SQSIZE // 2, SQSIZE // 2)
+                            for rad, alpha in [(42, 35), (34, 65), (26, 110), (18, 170)]:
+                                pygame.draw.circle(check_surf, (225, 45, 45, alpha), center, rad)
+                            surface.blit(check_surf, (c * SQSIZE, r * SQSIZE))
+                            return
+
+    def show_moves(self, surface):
+        """Draws signature modern dots and capture rings for valid moves."""
+        if self.dragger.dragging:
+            piece = self.dragger.piece
+
+            # Highlight source square
+            src_surf = pygame.Surface((SQSIZE, SQSIZE), pygame.SRCALPHA)
+            src_surf.fill((129, 182, 76, 100))
+            surface.blit(src_surf, (self.dragger.initial_col * SQSIZE, self.dragger.initial_row * SQSIZE))
+
+            dot_surf = pygame.Surface((SQSIZE, SQSIZE), pygame.SRCALPHA)
+            center = (SQSIZE // 2, SQSIZE // 2)
+
+            for move in piece.moves:
+                fr = move.final.row
+                fc = move.final.col
+                dest_sq = self.board.squares[fr][fc]
+                
+                is_capture = dest_sq.has_piece()
+                # Check en-passant capture
+                if not is_capture and piece.name == 'pawn' and abs(fc - move.initial.col) == 1 and dest_sq.isempty():
+                    is_capture = True
+
+                dot_surf.fill((0, 0, 0, 0))
+                if is_capture:
+                    # Sleek donut ring for capture target
+                    pygame.draw.circle(dot_surf, (20, 20, 20, 55), center, 39, width=5)
+                else:
+                    # Soft translucent circular dot for empty destination
+                    pygame.draw.circle(dot_surf, (20, 20, 20, 50), center, 13)
+
+                surface.blit(dot_surf, (fc * SQSIZE, fr * SQSIZE))
+
+    def show_hover(self, surface):
+        if self.hovered_sqr and not self.dragger.dragging:
+            hover_surf = pygame.Surface((SQSIZE, SQSIZE), pygame.SRCALPHA)
+            pygame.draw.rect(hover_surf, (255, 255, 255, 28), (0, 0, SQSIZE, SQSIZE))
+            pygame.draw.rect(hover_surf, (255, 255, 255, 75), (0, 0, SQSIZE, SQSIZE), width=2)
+            surface.blit(hover_surf, (self.hovered_sqr.col * SQSIZE, self.hovered_sqr.row * SQSIZE))
+
+    def show_pieces(self, surface):
+        for row in range(ROWS):
+            for col in range(COLS):
+                if self.board.squares[row][col].has_piece():
+                    piece = self.board.squares[row][col].piece
+                    
+                    if piece is not self.dragger.piece:
+                        piece.set_texture(size=80)
+                        tex_path = piece.texture
+                        if tex_path not in self.image_cache:
+                            try:
+                                self.image_cache[tex_path] = pygame.image.load(tex_path).convert_alpha()
+                            except pygame.error:
+                                self.image_cache[tex_path] = pygame.image.load(tex_path)
+                        
+                        img = self.image_cache[tex_path]
+                        img_center = (col * SQSIZE + SQSIZE // 2, row * SQSIZE + SQSIZE // 2)
+                        piece.texture_rect = img.get_rect(center=img_center)
+                        surface.blit(img, piece.texture_rect)
 
     def format_time(self, seconds):
         if seconds is None:
@@ -203,146 +335,329 @@ class Game:
         secs = int(seconds) % 60
         return f"{mins:02d}:{secs:02d}"
 
-    def show_status_bar(self, surface):
-        # Background
-        rect = (0, HEIGHT, WIDTH, 80)
-        pygame.draw.rect(surface, (30, 30, 30), rect)
-        
-        # Divider line
-        pygame.draw.line(surface, (60, 60, 60), (0, HEIGHT), (WIDTH, HEIGHT), 2)
-        
-        # Fonts
-        font_status = pygame.font.SysFont('arial', 18, bold=True)
-        font_help = pygame.font.SysFont('arial', 14)
-        
-        # Active Player
-        player_text = f"Turn: {self.next_player.upper()}"
-        player_color = (240, 240, 240) if self.next_player == 'white' else (180, 180, 180)
-        player_surface = font_status.render(player_text, True, player_color)
-        surface.blit(player_surface, (15, HEIGHT + 15))
-        
-        # AI Status & Elo Bands
-        elo_names = {
-            1: "1 (Beginner ~400)",
-            2: "2 (Casual ~800)",
-            3: "3 (Intermediate ~1200)",
-            4: "4 (Advanced ~1600)",
-            5: "5 (Master ~2200)",
-            6: "6 (Superhuman GM 3000+)"
-        }
-        lvl_str = elo_names.get(self.ai_difficulty, str(self.ai_difficulty))
-        
-        if self.ai_mode and self.auto_mode:
-            ai_text = f"AUTO [{lvl_str}]"
-            ai_color = (0, 220, 255)
-        elif self.ai_mode:
-            ai_text = f"AI [{lvl_str}]"
-            ai_color = (0, 200, 100)
+    def draw_side_disc(self, surface, color_name, center_x, center_y, radius=7):
+        if color_name == 'white':
+            pygame.draw.circle(surface, (180, 178, 172), (center_x, center_y + 1), radius)
+            pygame.draw.circle(surface, (245, 245, 240), (center_x, center_y), radius)
+            pygame.draw.circle(surface, (255, 255, 255), (center_x - 1, center_y - 1), radius - 2)
         else:
-            ai_text = "PVP Mode"
-            ai_color = (200, 100, 0)
-        ai_surface = font_status.render(ai_text, True, ai_color)
-        surface.blit(ai_surface, (150, HEIGHT + 15))
+            pygame.draw.circle(surface, (15, 15, 14), (center_x, center_y + 1), radius)
+            pygame.draw.circle(surface, (30, 29, 27), (center_x, center_y), radius)
+            pygame.draw.circle(surface, (70, 68, 64), (center_x, center_y), radius, width=1)
 
-        # Clocks
-        if self.white_time is not None:
-            w_str = f"W: {self.format_time(self.white_time)}"
-            b_str = f"B: {self.format_time(self.black_time)}"
-            clock_text = f"{w_str} | {b_str}"
-            clock_color = (255, 215, 0) if (self.white_time < 30 or self.black_time < 30) else (220, 220, 220)
-            clock_surf = font_status.render(clock_text, True, clock_color)
-            surface.blit(clock_surf, (410, HEIGHT + 15))
+    def draw_pill(self, surface, text, x, y, bg_col, border_col, txt_col, font=None):
+        if font is None:
+            font = self.font_badge
+        rendered = font.render(text, True, txt_col)
+        w = rendered.get_width() + 12
+        h = rendered.get_height() + 6
+        rect = pygame.Rect(x, y, w, h)
+        pygame.draw.rect(surface, bg_col, rect, border_radius=6)
+        pygame.draw.rect(surface, border_col, rect, width=1, border_radius=6)
+        surface.blit(rendered, rendered.get_rect(center=rect.center))
+        return rect.right
+
+    def show_status_bar(self, surface):
+        """Renders the modernized glassmorphic game control center & dashboard."""
+        bar_rect = pygame.Rect(0, HEIGHT, WIDTH, BAR_HEIGHT)
+        pygame.draw.rect(surface, (24, 23, 20), bar_rect)
+        pygame.draw.line(surface, (45, 42, 36), (0, HEIGHT), (WIDTH, HEIGHT), 2)
         
-        # Check / Checkmate / Stalemate Status
-        status_text = ""
-        status_color = (255, 255, 255)
+        # Subtle glass rim highlight
+        rim_surf = pygame.Surface((WIDTH, 1), pygame.SRCALPHA)
+        rim_surf.fill((255, 255, 255, 20))
+        surface.blit(rim_surf, (0, HEIGHT + 2))
+
+        # ---------------------------------------------------------
+        # ROW 1: TURN, MATCH STATUS, AND CLOCKS
+        # ---------------------------------------------------------
+        r1_y = HEIGHT + 12
+
+        # 1. Left: Turn Indicator & Disc
+        self.draw_side_disc(surface, self.next_player, 22, r1_y + 10, radius=8)
+        turn_str = f"{self.next_player.capitalize()} to move"
+        turn_surf = self.font_status.render(turn_str, True, (240, 238, 232))
+        surface.blit(turn_surf, (37, r1_y + 1))
+
+        # Turn state pill
+        curr_x = 37 + turn_surf.get_width() + 8
+        is_ai_thinking = self.ai_mode and (self.auto_mode or self.next_player == self.ai_player) and not self.game_over
+        
+        if self.game_over:
+            curr_x = self.draw_pill(surface, "Finished", curr_x, r1_y, (45, 43, 38), (68, 64, 56), (180, 178, 172))
+        elif is_ai_thinking:
+            curr_x = self.draw_pill(surface, "Thinking...", curr_x, r1_y, (20, 42, 54), (40, 120, 160), (80, 200, 250))
+        else:
+            curr_x = self.draw_pill(surface, "Your Turn", curr_x, r1_y, (32, 48, 24), (80, 140, 50), (140, 210, 80))
+
+        # Material imbalance
+        imb = self.get_material_imbalance()
+        if imb != 0:
+            imb_str = f"+{imb}" if imb > 0 else f"+{abs(imb)}"
+            self.draw_pill(surface, imb_str, curr_x + 4, r1_y, (36, 34, 30), (58, 55, 48), (210, 208, 200))
+
+        # 2. Right: Digital Clocks
+        clock_rx = WIDTH - 12
+        if self.white_time is not None:
+            # Black Clock
+            b_active = (self.next_player == 'black' and not self.game_over)
+            b_bg = (38, 54, 28) if b_active else (34, 32, 28)
+            b_border = (129, 182, 76) if b_active else (54, 51, 45)
+            b_col = (255, 90, 90) if self.black_time < 30 else (240, 238, 232)
+            b_rect = pygame.Rect(clock_rx - 90, r1_y - 2, 90, 26)
+            pygame.draw.rect(surface, b_bg, b_rect, border_radius=6)
+            pygame.draw.rect(surface, b_border, b_rect, width=1, border_radius=6)
+            b_txt = self.font_clock.render(f"B {self.format_time(self.black_time)}", True, b_col)
+            surface.blit(b_txt, b_txt.get_rect(center=b_rect.center))
+
+            # White Clock
+            w_active = (self.next_player == 'white' and not self.game_over)
+            w_bg = (38, 54, 28) if w_active else (34, 32, 28)
+            w_border = (129, 182, 76) if w_active else (54, 51, 45)
+            w_col = (255, 90, 90) if self.white_time < 30 else (240, 238, 232)
+            w_rect = pygame.Rect(clock_rx - 188, r1_y - 2, 90, 26)
+            pygame.draw.rect(surface, w_bg, w_rect, border_radius=6)
+            pygame.draw.rect(surface, w_border, w_rect, width=1, border_radius=6)
+            w_txt = self.font_clock.render(f"W {self.format_time(self.white_time)}", True, w_col)
+            surface.blit(w_txt, w_txt.get_rect(center=w_rect.center))
+        else:
+            untimed_rect = pygame.Rect(clock_rx - 96, r1_y - 2, 96, 26)
+            pygame.draw.rect(surface, (34, 32, 28), untimed_rect, border_radius=6)
+            pygame.draw.rect(surface, (54, 51, 45), untimed_rect, width=1, border_radius=6)
+            u_txt = self.font_sub.render("Untimed", True, (160, 157, 149))
+            surface.blit(u_txt, u_txt.get_rect(center=untimed_rect.center))
+
+        # ---------------------------------------------------------
+        # ROW 2: TACTILE CLICKABLE ACTION TOOLBAR
+        # ---------------------------------------------------------
+        elo_names = {
+            1: "Beginner",
+            2: "Casual",
+            3: "Intermediate",
+            4: "Advanced",
+            5: "Master",
+            6: "Stockfish GM"
+        }
+        diff_str = elo_names.get(self.ai_difficulty, f"Lv.{self.ai_difficulty}")
+
+        mode_str = "AI" if self.ai_mode and not self.auto_mode else ("Auto" if self.auto_mode else "PvP")
+        theme_name = getattr(self.config.theme, 'name', 'Classic')
+
+        btn_defs = [
+            ('menu', "Menu", "M"),
+            ('reset', "Reset", "R"),
+            ('mode', f"Mode: {mode_str}", "A"),
+            ('theme', f"Theme: {theme_name}", "T"),
+            ('level', f"Lv.{self.ai_difficulty} {diff_str}", "1-6")
+        ]
+
+        for key, label, badge in btn_defs:
+            b_rect = self.buttons[key]
+            is_hover = (self.hovered_btn == key)
+            bg_col = (52, 49, 43) if is_hover else (36, 34, 30)
+            border_col = (96, 92, 82) if is_hover else (54, 51, 45)
+
+            pygame.draw.rect(surface, bg_col, b_rect, border_radius=7)
+            pygame.draw.rect(surface, border_col, b_rect, width=1, border_radius=7)
+
+            txt_col = (255, 255, 255) if is_hover else (225, 222, 215)
+            ic_x = b_rect.x + 8
+            ic_y = b_rect.centery
+
+            # Draw dedicated sharp vector icons
+            if key == 'menu':
+                # 3 horizontal menu bars
+                for off in [-4, 0, 4]:
+                    pygame.draw.line(surface, txt_col, (ic_x, ic_y + off), (ic_x + 9, ic_y + off), 2)
+                text_start_x = ic_x + 15
+            elif key == 'reset':
+                # Reload circular arc with arrow
+                arc_rect = pygame.Rect(ic_x, ic_y - 6, 12, 12)
+                pygame.draw.arc(surface, txt_col, arc_rect, 0.5, 5.8, 2)
+                pygame.draw.polygon(surface, txt_col, [(ic_x + 9, ic_y - 8), (ic_x + 13, ic_y - 4), (ic_x + 7, ic_y - 3)])
+                text_start_x = ic_x + 16
+            elif key == 'mode':
+                # Mini bot icon
+                bot_rect = pygame.Rect(ic_x, ic_y - 5, 11, 10)
+                pygame.draw.rect(surface, txt_col, bot_rect, border_radius=2)
+                pygame.draw.circle(surface, bg_col, (ic_x + 3, ic_y), 1)
+                pygame.draw.circle(surface, bg_col, (ic_x + 8, ic_y), 1)
+                text_start_x = ic_x + 16
+            elif key == 'theme':
+                # Theme color swatch (split light/dark squares)
+                sw_rect = pygame.Rect(ic_x, ic_y - 6, 12, 12)
+                th = self.config.theme
+                pygame.draw.rect(surface, th.bg.light, (ic_x, ic_y - 6, 6, 12), border_top_left_radius=2, border_bottom_left_radius=2)
+                pygame.draw.rect(surface, th.bg.dark, (ic_x + 6, ic_y - 6, 6, 12), border_top_right_radius=2, border_bottom_right_radius=2)
+                pygame.draw.rect(surface, (100, 96, 88), sw_rect, width=1, border_radius=2)
+                text_start_x = ic_x + 17
+            elif key == 'level':
+                # Lightning bolt icon
+                pts = [(ic_x + 5, ic_y - 6), (ic_x + 2, ic_y), (ic_x + 6, ic_y), (ic_x + 3, ic_y + 6), (ic_x + 9, ic_y - 1), (ic_x + 6, ic_y - 1)]
+                pygame.draw.polygon(surface, (255, 205, 60), pts)
+                text_start_x = ic_x + 14
+            else:
+                text_start_x = ic_x
+
+            # Button Text
+            b_txt = self.font_btn.render(label, True, txt_col)
+            surface.blit(b_txt, (text_start_x, b_rect.centery - b_txt.get_height() // 2))
+
+            # Shortcut Badge Tag
+            badge_surf = self.font_btn_badge.render(badge, True, (150, 147, 140))
+            badge_w = badge_surf.get_width() + 8
+            badge_rect = pygame.Rect(b_rect.right - badge_w - 6, b_rect.centery - 8, badge_w, 16)
+            pygame.draw.rect(surface, (26, 25, 22), badge_rect, border_radius=4)
+            surface.blit(badge_surf, badge_surf.get_rect(center=badge_rect.center))
+
+    def show_game_over_banner(self, surface):
+        """Displays a polished victory / draw celebration card on game completion."""
+        if not self.game_over or self.game_over_dismissed:
+            return
+
+        # Modal backdrop
+        backdrop = pygame.Surface((WIDTH, HEIGHT + BAR_HEIGHT), pygame.SRCALPHA)
+        backdrop.fill((0, 0, 0, 140))
+        surface.blit(backdrop, (0, 0))
+
+        # Card Container
+        modal_w = 480
+        modal_h = 196
+        modal_x = (WIDTH - modal_w) // 2
+        modal_y = (HEIGHT - modal_h) // 2 - 20
+        modal_rect = pygame.Rect(modal_x, modal_y, modal_w, modal_h)
+
+        # Drop shadow
+        for i in range(12, 0, -2):
+            s_rect = pygame.Rect(modal_rect.x - i, modal_rect.y - i + 4, modal_rect.w + i * 2, modal_rect.h + i * 2)
+            s_surf = pygame.Surface((s_rect.w, s_rect.h), pygame.SRCALPHA)
+            s_surf.fill((0, 0, 0, int(28 * (1.0 - i / 12))))
+            surface.blit(s_surf, s_rect)
+
+        pygame.draw.rect(surface, (28, 27, 24), modal_rect, border_radius=18)
+        pygame.draw.rect(surface, (60, 56, 50), modal_rect, width=2, border_radius=18)
+
+        # Glass top rim
+        rim = pygame.Surface((modal_w - 36, 2), pygame.SRCALPHA)
+        rim.fill((255, 255, 255, 30))
+        surface.blit(rim, (modal_x + 18, modal_y + 1))
+
+        # Close button in corner
+        self.modal_close_rect = pygame.Rect(modal_x + modal_w - 34, modal_y + 12, 22, 22)
+        pygame.draw.rect(surface, (42, 40, 36), self.modal_close_rect, border_radius=6)
+        cx, cy = self.modal_close_rect.center
+        pygame.draw.line(surface, (160, 157, 149), (cx - 4, cy - 4), (cx + 4, cy + 4), 2)
+        pygame.draw.line(surface, (160, 157, 149), (cx + 4, cy - 4), (cx - 4, cy + 4), 2)
+
+        # Outcomes Header
         if self.timeout_winner:
-            status_text = f"{self.timeout_winner.upper()} WON ON TIME!"
-            status_color = (255, 80, 80)
+            w_str = self.timeout_winner.capitalize()
+            title = f"{w_str} Won on Time!"
+            sub = "Opponent ran out of time on the chess clock."
+            title_col = (255, 120, 120)
         elif self.checkmate:
-            status_text = "CHECKMATE!"
-            status_color = (255, 50, 50)
+            winner = 'Black' if self.next_player == 'white' else 'White'
+            title = f"{winner} Won by Checkmate!"
+            sub = f"Victory by checkmate. Outstanding match."
+            title_col = (129, 182, 76)
         elif self.stalemate:
-            status_text = "STALEMATE!"
-            status_color = (150, 150, 150)
-        elif self.check:
-            status_text = "CHECK!"
-            status_color = (255, 150, 50)
-        elif self.game_over:
-            status_text = "GAME OVER"
-            status_color = (150, 150, 150)
-            
-        if status_text:
-            status_surface = font_status.render(status_text, True, status_color)
-            surface.blit(status_surface, (580, HEIGHT + 15))
-            
-        # Help Guide / Controls
-        help_text = "Keys: [M] Menu  |  [A] AI Mode  |  [R] Reset  |  [T] Theme  |  [1-6] Elo Levels"
-        help_surface = font_help.render(help_text, True, (150, 150, 150))
-        surface.blit(help_surface, (15, HEIGHT + 48))
+            title = "Drawn by Stalemate"
+            sub = "No legal moves remaining with the King safe."
+            title_col = (210, 208, 200)
+        else:
+            title = "Game Over"
+            sub = "The match has concluded."
+            title_col = (210, 208, 200)
 
-    def show_pieces(self, surface):
-        for row in range(ROWS):
-            for col in range(COLS):
+        # Draw victory star badge above title
+        badge_center_x = WIDTH // 2
+        badge_center_y = modal_y + 30
+        pygame.draw.circle(surface, (38, 54, 28) if self.checkmate else (46, 43, 38), (badge_center_x, badge_center_y), 13)
+        pygame.draw.circle(surface, (129, 182, 76) if self.checkmate else (90, 86, 78), (badge_center_x, badge_center_y), 13, width=1)
+        # 4-point star in center
+        p_star = [
+            (badge_center_x, badge_center_y - 7),
+            (badge_center_x + 2, badge_center_y - 2),
+            (badge_center_x + 7, badge_center_y),
+            (badge_center_x + 2, badge_center_y + 2),
+            (badge_center_x, badge_center_y + 7),
+            (badge_center_x - 2, badge_center_y + 2),
+            (badge_center_x - 7, badge_center_y),
+            (badge_center_x - 2, badge_center_y - 2)
+        ]
+        pygame.draw.polygon(surface, (140, 210, 80) if self.checkmate else (200, 196, 185), p_star)
 
-                # piece ?
-                if self.board.squares[row][col].has_piece():
-                    piece = self.board.squares[row][col].piece
-                    
-                    # all pieces except dragger piece
-                    if piece is not self.dragger.piece:
-                        piece.set_texture(size=80)
-                        img = pygame.image.load(piece.texture)
-                        img_center = col * SQSIZE + SQSIZE // 2, row * SQSIZE + SQSIZE // 2
-                        piece.texture_rect = img.get_rect(center=img_center)
-                        surface.blit(img, piece.texture_rect)
+        t_surf = self.font_modal_title.render(title, True, title_col)
+        surface.blit(t_surf, t_surf.get_rect(center=(WIDTH // 2, modal_y + 58)))
 
-    def show_moves(self, surface):
-        theme = self.config.theme
+        sub_surf = self.font_modal_sub.render(sub, True, (160, 157, 149))
+        surface.blit(sub_surf, sub_surf.get_rect(center=(WIDTH // 2, modal_y + 86)))
 
-        if self.dragger.dragging:
-            piece = self.dragger.piece
+        # Action Buttons
+        self.modal_rematch_rect = pygame.Rect(modal_x + 36, modal_y + 124, 192, 44)
+        self.modal_menu_rect = pygame.Rect(modal_x + 252, modal_y + 124, 192, 44)
 
-            # loop all valid moves
-            for move in piece.moves:
+        # Rematch button (Green accent)
+        pygame.draw.rect(surface, (129, 182, 76), self.modal_rematch_rect, border_radius=10)
+        rem_txt = self.font_status.render("Play Again (R)", True, (20, 26, 15))
+        surface.blit(rem_txt, rem_txt.get_rect(center=self.modal_rematch_rect.center))
 
-                # color
-                color = theme.moves.light if (move.final.row + move.final.col) % 2 == 0 else theme.moves.dark
-                # rect
-                rect = (move.final.col * SQSIZE, move.final.row * SQSIZE, SQSIZE, SQSIZE)
-                # blit
-                pygame.draw.rect(surface, color, rect)
+        # Menu button (Dark card)
+        pygame.draw.rect(surface, (42, 40, 36), self.modal_menu_rect, border_radius=10)
+        pygame.draw.rect(surface, (68, 64, 56), self.modal_menu_rect, width=1, border_radius=10)
+        menu_txt = self.font_status.render("Setup Menu (M)", True, (240, 238, 232))
+        surface.blit(menu_txt, menu_txt.get_rect(center=self.modal_menu_rect.center))
 
-    def show_last_move(self, surface):
-        theme = self.config.theme
+    # -------------------------------------------------------------
+    # EVENT AND INPUT HANDLERS
+    # -------------------------------------------------------------
 
-        if self.board.last_move:
-            initial = self.board.last_move.initial
-            final = self.board.last_move.final
+    def handle_mouse_motion(self, pos):
+        """Updates hover states and applies modern system cursors."""
+        self.hovered_btn = None
+        is_hand = False
 
-            for pos in [initial, final]:
+        # Check toolbar buttons
+        if pos[1] >= HEIGHT:
+            for key, rect in self.buttons.items():
+                if rect.collidepoint(pos):
+                    self.hovered_btn = key
+                    is_hand = True
+                    break
+        elif self.game_over and not self.game_over_dismissed:
+            if (self.modal_rematch_rect and self.modal_rematch_rect.collidepoint(pos)) or \
+               (self.modal_menu_rect and self.modal_menu_rect.collidepoint(pos)) or \
+               (self.modal_close_rect and self.modal_close_rect.collidepoint(pos)):
+                is_hand = True
+        else:
+            motion_row = pos[1] // SQSIZE
+            motion_col = pos[0] // SQSIZE
+            self.set_hover(motion_row, motion_col)
 
-                # color
-                color = theme.trace.light if (pos.row + pos.col) % 2 == 0 else theme.trace.dark
-                # rect
-                rect = (pos.col * SQSIZE, pos.row * SQSIZE, SQSIZE, SQSIZE)
-                # blit
-                pygame.draw.rect(surface, color, rect)
+        if is_hand:
+            pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_HAND)
+        else:
+            pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_ARROW)
 
-    def show_hover(self, surface):
-        if self.hovered_sqr:
-            
-            # color
-            color = (180, 180, 180)
-            # rect
-            rect = (self.hovered_sqr.col * SQSIZE, self.hovered_sqr.row * SQSIZE, SQSIZE, SQSIZE)
-            # blit
-            pygame.draw.rect(surface, color, rect, width=3)
+    def handle_button_click(self, pos):
+        """Processes clicks on status bar and modal action buttons."""
+        if self.game_over and not self.game_over_dismissed:
+            if self.modal_rematch_rect and self.modal_rematch_rect.collidepoint(pos):
+                return 'rematch'
+            if self.modal_menu_rect and self.modal_menu_rect.collidepoint(pos):
+                return 'menu'
+            if self.modal_close_rect and self.modal_close_rect.collidepoint(pos):
+                self.game_over_dismissed = True
+                return 'dismiss'
 
-    # other methods
+        if pos[1] >= HEIGHT:
+            for key, rect in self.buttons.items():
+                if rect.collidepoint(pos):
+                    return key
+
+        return None
 
     def next_turn(self):
-        import time
         if self.white_time is not None and self.increment > 0:
             if self.next_player == 'white':
                 self.white_time += self.increment
@@ -369,13 +684,12 @@ class Game:
             self.config.move_sound.play()
 
     def reset(self):
+        saved_config = self.active_config
         self.__init__()
+        if saved_config:
+            self.setup(saved_config)
 
     def update_game_state(self):
-        """
-        Update the game state (check, checkmate, stalemate)
-        """
-        # Check if current player is in check
         king = self.board.get_king(self.next_player)
         if king:
             self.check = self.board.is_in_check(king, None)
@@ -388,3 +702,4 @@ class Game:
 
         if self.checkmate or self.stalemate:
             self.game_over = True
+            self.game_over_dismissed = False
