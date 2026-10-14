@@ -115,7 +115,8 @@ Chess-AI/
 ├── assets/
 │   ├── images/
 │   │   ├── imgs-80px/        # 80x80 chess piece sprites
-│   │   └── imgs-128px/       # 128x128 high-res piece sprites
+│   │   ├── imgs-128px/       # 128x128 high-res piece sprites
+│   │   └── reticles/         # Tactical corner reticle overlays (Blue, Green, White, Red)
 │   └── sounds/
 │       ├── move.wav          # Piece move audio
 │       └── capture.wav       # Piece capture audio
@@ -123,21 +124,22 @@ Chess-AI/
 │   ├── board.py              # 8x8 Board state, move validation & check detection
 │   ├── chess_ai.py           # Minimax algorithm & Stockfish UCI engine interface
 │   ├── color.py              # Board color definition helper
-│   ├── config.py             # Themes, sounds, and visual configuration
+│   ├── config.py             # Themes, reticle color palettes, sounds, and visual settings
 │   ├── const.py              # Screen dimensions and board constants
 │   ├── download_stockfish.py # Automated Stockfish 17 download script
-│   ├── dragger.py            # Drag-and-drop piece interaction logic
-│   ├── game.py               # Game state, turn handling, clock, and rendering
-│   ├── main.py               # Main Pygame event loop
-│   ├── menu.py               # Start menu with GUI buttons and settings
+│   ├── dragger.py            # Drag-and-drop & click piece interaction logic
+│   ├── game.py               # Game state, clocks, reticle rendering, and HUD toolbar
+│   ├── main.py               # Main Pygame event loop & interactive controls
+│   ├── menu.py               # Glassmorphic setup menu modal & difficulty tiers
 │   ├── move.py               # Move data structure
 │   ├── piece.py              # Piece class hierarchy (Pawn, Knight, Bishop, Rook, Queen, King)
 │   ├── sound.py              # Pygame audio player wrapper
 │   ├── square.py             # Board square representation
 │   ├── stockfish.exe         # Stockfish 17 AVX2 engine binary
-│   └── theme.py              # Theme color definition
+│   └── theme.py              # Board theme color definitions
 ├── CLASS_DIAGRAM.md          # Architecture & UML class specifications
 ├── class-diagram.jpeg        # Rendered UML class diagram
+├── LICENSE                   # MIT License
 ├── main.py                   # Root launcher entry point
 ├── requirements.txt          # Python library dependencies
 ├── run.bat                   # 1-click Windows launcher

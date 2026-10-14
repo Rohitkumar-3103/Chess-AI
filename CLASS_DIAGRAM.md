@@ -69,6 +69,11 @@ classDiagram
         +float increment
         +float last_tick
         +str timeout_winner
+        +Piece selected_piece
+        +int selected_row
+        +int selected_col
+        +dict reticle_surfaces
+        +dict reticle_hover_surfaces
         +__init__()
         +setup(config: dict)
         +update_clock()
@@ -87,7 +92,10 @@ classDiagram
         +format_time(seconds) str
         +next_turn()
         +set_hover(row, col)
+        +select(piece, row, col)
+        +deselect()
         +change_theme()
+        +change_reticle_color()
         +play_sound(captured: bool)
         +reset()
         +update_game_state()
@@ -208,11 +216,16 @@ classDiagram
         +list themes
         +int idx
         +Theme theme
+        +dict reticle_colors
+        +list reticle_color_names
+        +int reticle_idx
+        +str reticle_color_name
         +Font font
         +Sound move_sound
         +Sound capture_sound
         +__init__()
         +change_theme()
+        +change_reticle_color()
         +_add_themes()
     }
 
