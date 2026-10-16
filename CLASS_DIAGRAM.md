@@ -4,10 +4,30 @@ This document describes the object-oriented architecture, component relationship
 
 ---
 
-## 1. Class Diagram (Mermaid)
+## 1. Visual Architecture Diagrams
+
+### Complete UML Class Diagram (with Architecture Legend)
+![Chess-AI UML Class Diagram](Chess-AI%20UML%20Class%20Diagram.png)
+
+### Alternative Blueprint Architecture Diagram
+![Chess-AI Blueprint Diagram](Chess-AI%20Class%20Diagram.png)
+
+---
+
+## 2. Interactive Class Diagram (Mermaid)
 
 ```mermaid
 classDiagram
+    class Const {
+        +int WIDTH
+        +int HEIGHT
+        +int BAR_HEIGHT
+        +int TOTAL_HEIGHT
+        +int ROWS
+        +int COLS
+        +int SQSIZE
+    }
+
     class Main {
         +Surface screen
         +Game game
@@ -277,7 +297,7 @@ classDiagram
 
 ---
 
-## 2. Interaction Sequence Diagram (Menu & Match Lifecycle)
+## 3. Interaction Sequence Diagram (Menu & Match Lifecycle)
 
 ```mermaid
 sequenceDiagram
@@ -330,7 +350,7 @@ sequenceDiagram
 
 ---
 
-## 3. Architecture & Component Descriptions
+## 4. Architecture & Component Descriptions
 
 | Component | Responsibility |
 | :--- | :--- |
@@ -347,7 +367,7 @@ sequenceDiagram
 
 ---
 
-## 4. UI Design System & Visual Specification
+## 5. UI Design System & Visual Specification
 
 ### Color Tokens
 

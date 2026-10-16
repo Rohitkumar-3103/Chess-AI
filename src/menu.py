@@ -29,7 +29,7 @@ class StartMenu:
         self.font_item_sub = pygame.font.SysFont(font_family, 11)
         self.font_badge = pygame.font.SysFont(font_family, 10, bold=True)
         self.font_btn = pygame.font.SysFont(font_family, 17, bold=True)
-        self.font_hint = pygame.font.SysFont(font_family, 11)
+        self.font_hint = pygame.font.SysFont(font_family, 12, bold=True)
 
         # Modal Geometry (Centered inside screen)
         self.modal_w = 630
@@ -373,15 +373,31 @@ class StartMenu:
             # -------------------------------------------------------------
             sum_y = base_time_y + 2 * time_h + time_gap_y + 16
             sum_rect = pygame.Rect(start_x, sum_y, btn_w, 36)
-            pygame.draw.rect(self.screen, (33, 31, 28), sum_rect, border_radius=10)
-            pygame.draw.rect(self.screen, (48, 46, 40), sum_rect, width=1, border_radius=10)
+            pygame.draw.rect(self.screen, (24, 23, 20), sum_rect, border_radius=10)
+            pygame.draw.rect(self.screen, (68, 64, 56), sum_rect, width=1, border_radius=10)
 
-            # Summary string
+            # High-contrast, clean summary with distinct hierarchy
             diff_level = 2 if self.selected_difficulty == "Basic" else (4 if self.selected_difficulty == "Intermediate" else 6)
             engine_str = "Stockfish 17 UCI" if diff_level >= 4 else "Minimax Positional"
-            summary_str = f"Side: {self.selected_color}  •  AI: {self.selected_difficulty} (Lv.{diff_level})  •  {self.selected_time}  •  {engine_str}"
-            sum_surf = self.font_hint.render(summary_str, True, (175, 172, 163))
-            self.screen.blit(sum_surf, sum_surf.get_rect(center=sum_rect.center))
+
+            segments = [
+                ("Side: ", (170, 166, 158)),
+                (f"{self.selected_color}", (245, 245, 240)),
+                ("  •  ", (110, 106, 98)),
+                ("AI: ", (170, 166, 158)),
+                (f"{self.selected_difficulty} (Lv.{diff_level})", (245, 245, 240)),
+                ("  •  ", (110, 106, 98)),
+                (f"{self.selected_time}", (245, 245, 240)),
+                ("  •  ", (110, 106, 98)),
+                (f"{engine_str}", (140, 198, 84))
+            ]
+
+            surfs = [self.font_hint.render(text, True, col) for text, col in segments]
+            total_text_w = sum(s.get_width() for s in surfs)
+            cur_x = sum_rect.centerx - total_text_w // 2
+            for s in surfs:
+                self.screen.blit(s, (cur_x, sum_rect.centery - s.get_height() // 2))
+                cur_x += s.get_width()
 
             # -------------------------------------------------------------
             # START GAME BUTTON

@@ -106,12 +106,12 @@ class Game:
         y = HEIGHT + 48
         h = 32
         self.buttons = {
-            'menu': pygame.Rect(7, y, 78, h),
-            'reset': pygame.Rect(89, y, 78, h),
-            'mode': pygame.Rect(171, y, 108, h),
-            'theme': pygame.Rect(283, y, 138, h),
-            'reticle': pygame.Rect(425, y, 134, h),
-            'level': pygame.Rect(563, y, 150, h)
+            'menu': pygame.Rect(8, y, 80, h),
+            'reset': pygame.Rect(96, y, 78, h),
+            'mode': pygame.Rect(182, y, 112, h),
+            'theme': pygame.Rect(302, y, 136, h),
+            'reticle': pygame.Rect(446, y, 116, h),
+            'level': pygame.Rect(570, y, 142, h)
         }
         # Modal buttons
         self.modal_rematch_rect = pygame.Rect(155, 385, 185, 42)
@@ -361,8 +361,7 @@ class Game:
                 dot_surf.fill((0, 0, 0, 0))
                 if is_capture:
                     # Sleek donut ring for capture target matching reticle color
-                    pygame.draw.circle(dot_surf, (*ret_col, 190), center, 39, width=5)
-                    pygame.draw.circle(dot_surf, (20, 20, 20, 50), center, 39, width=2)
+                    pygame.draw.circle(dot_surf, (*ret_col, 200), center, 39, width=5)
                 else:
                     # Soft translucent circular dot for empty destination
                     pygame.draw.circle(dot_surf, (*ret_col, 160), center, 14)
@@ -525,6 +524,16 @@ class Game:
             ('level', f"Lv.{self.ai_difficulty} {diff_str}", "1-6")
         ]
 
+        # Icon widths for content centering
+        icon_widths = {
+            'menu': 10,
+            'reset': 12,
+            'mode': 11,
+            'theme': 12,
+            'reticle': 11,
+            'level': 9
+        }
+
         for key, label, badge in btn_defs:
             b_rect = self.buttons[key]
             is_hover = (self.hovered_btn == key)
@@ -535,7 +544,20 @@ class Game:
             pygame.draw.rect(surface, border_col, b_rect, width=1, border_radius=7)
 
             txt_col = (255, 255, 255) if is_hover else (225, 222, 215)
-            ic_x = b_rect.x + 8
+            ic_w = icon_widths.get(key, 12)
+            gap_icon = 5
+            gap_badge = 3
+            badge_pad = 6
+
+            b_txt = self.font_btn.render(label, True, txt_col)
+            badge_surf = self.font_btn_badge.render(badge, True, (150, 147, 140))
+            badge_w = badge_surf.get_width() + badge_pad
+
+            # Calculate content layout: center icon + text + badge with snug, clean spacing
+            total_w = ic_w + gap_icon + b_txt.get_width() + gap_badge + badge_w
+            start_x = b_rect.x + max(4, (b_rect.w - total_w) // 2)
+
+            ic_x = start_x
             ic_y = b_rect.centery
 
             # Draw dedicated sharp vector icons
@@ -543,20 +565,17 @@ class Game:
                 # 3 horizontal menu bars
                 for off in [-4, 0, 4]:
                     pygame.draw.line(surface, txt_col, (ic_x, ic_y + off), (ic_x + 9, ic_y + off), 2)
-                text_start_x = ic_x + 15
             elif key == 'reset':
                 # Reload circular arc with arrow
                 arc_rect = pygame.Rect(ic_x, ic_y - 6, 12, 12)
                 pygame.draw.arc(surface, txt_col, arc_rect, 0.5, 5.8, 2)
                 pygame.draw.polygon(surface, txt_col, [(ic_x + 9, ic_y - 8), (ic_x + 13, ic_y - 4), (ic_x + 7, ic_y - 3)])
-                text_start_x = ic_x + 16
             elif key == 'mode':
                 # Mini bot icon
                 bot_rect = pygame.Rect(ic_x, ic_y - 5, 11, 10)
                 pygame.draw.rect(surface, txt_col, bot_rect, border_radius=2)
                 pygame.draw.circle(surface, bg_col, (ic_x + 3, ic_y), 1)
                 pygame.draw.circle(surface, bg_col, (ic_x + 8, ic_y), 1)
-                text_start_x = ic_x + 16
             elif key == 'theme':
                 # Theme color swatch (split light/dark squares)
                 sw_rect = pygame.Rect(ic_x, ic_y - 6, 12, 12)
@@ -564,7 +583,6 @@ class Game:
                 pygame.draw.rect(surface, th.bg.light, (ic_x, ic_y - 6, 6, 12), border_top_left_radius=2, border_bottom_left_radius=2)
                 pygame.draw.rect(surface, th.bg.dark, (ic_x + 6, ic_y - 6, 6, 12), border_top_right_radius=2, border_bottom_right_radius=2)
                 pygame.draw.rect(surface, (100, 96, 88), sw_rect, width=1, border_radius=2)
-                text_start_x = ic_x + 17
             elif key == 'reticle':
                 # Mini 4-corner tactical reticle icon matching active color
                 ret_c = self.config.reticle_color
@@ -576,23 +594,18 @@ class Game:
                 pygame.draw.lines(surface, ret_c, False, [(ic_x, ic_y + 2), (ic_x, ic_y + 5), (ic_x + 3, ic_y + 5)], 2)
                 # Bottom-Right bracket
                 pygame.draw.lines(surface, ret_c, False, [(ic_x + 8, ic_y + 5), (ic_x + 11, ic_y + 5), (ic_x + 11, ic_y + 2)], 2)
-                text_start_x = ic_x + 16
             elif key == 'level':
                 # Lightning bolt icon
                 pts = [(ic_x + 5, ic_y - 6), (ic_x + 2, ic_y), (ic_x + 6, ic_y), (ic_x + 3, ic_y + 6), (ic_x + 9, ic_y - 1), (ic_x + 6, ic_y - 1)]
                 pygame.draw.polygon(surface, (255, 205, 60), pts)
-                text_start_x = ic_x + 14
-            else:
-                text_start_x = ic_x
 
-            # Button Text
-            b_txt = self.font_btn.render(label, True, txt_col)
+            # Button Text (placed right after icon)
+            text_start_x = ic_x + ic_w + gap_icon
             surface.blit(b_txt, (text_start_x, b_rect.centery - b_txt.get_height() // 2))
 
-            # Shortcut Badge Tag
-            badge_surf = self.font_btn_badge.render(badge, True, (150, 147, 140))
-            badge_w = badge_surf.get_width() + 8
-            badge_rect = pygame.Rect(b_rect.right - badge_w - 6, b_rect.centery - 8, badge_w, 16)
+            # Shortcut Badge Tag (placed directly next to text with a sleek 3px gap)
+            badge_x = text_start_x + b_txt.get_width() + gap_badge
+            badge_rect = pygame.Rect(badge_x, b_rect.centery - 8, badge_w, 16)
             pygame.draw.rect(surface, (26, 25, 22), badge_rect, border_radius=4)
             surface.blit(badge_surf, badge_surf.get_rect(center=badge_rect.center))
 

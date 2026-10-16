@@ -33,10 +33,13 @@ An intelligent, object-oriented Chess application built with **Python**, **Pygam
 
 ## 📐 Architecture & Class Design
 
-The project is structured with clean Object-Oriented Principles (OOP). A complete UML diagram is provided:
+The project is structured with clean Object-Oriented Principles (OOP). Full architectural specifications and high-resolution diagrams are provided:
 
 - 📄 Detailed specification: [CLASS_DIAGRAM.md](CLASS_DIAGRAM.md)
-- 🖼️ Visual diagram: [class-diagram.jpeg](class-diagram.jpeg)
+- 🖼️ Complete UML Diagram (with Legend): [Chess-AI UML Class Diagram.png](Chess-AI%20UML%20Class%20Diagram.png)
+- 🖼️ Blueprint Architecture Diagram: [Chess-AI Class Diagram.png](Chess-AI%20Class%20Diagram.png)
+
+![Chess-AI UML Class Diagram](Chess-AI%20UML%20Class%20Diagram.png)
 
 ```
                     ┌─────────────┐
@@ -138,7 +141,8 @@ Chess-AI/
 │   ├── stockfish.exe         # Stockfish 17 AVX2 engine binary
 │   └── theme.py              # Board theme color definitions
 ├── CLASS_DIAGRAM.md          # Architecture & UML class specifications
-├── class-diagram.jpeg        # Rendered UML class diagram
+├── Chess-AI UML Class Diagram.png # Comprehensive UML diagram with Legend
+├── Chess-AI Class Diagram.png # Blueprint architecture diagram
 ├── LICENSE                   # MIT License
 ├── main.py                   # Root launcher entry point
 ├── requirements.txt          # Python library dependencies
